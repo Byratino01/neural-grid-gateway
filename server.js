@@ -1,6 +1,7 @@
 import http from "node:http";
 import crypto from "node:crypto";
 import {WebSocketServer} from "ws";
+import {listConnectors,routeConnectorEvent} from "./connector-registry.js";
 
 // Execution is deliberately unavailable. Changing an environment variable cannot enable it.
 const mode = "monitor";
@@ -39,7 +40,8 @@ function telemetry(input, origin) {
     source:safe(input.source || origin, 80),
     destination:safe(input.destination || "neural-grid", 80),
     correlationId:safe(input.correlationId || "", 80),
-    payloadVersion:"1",metadata,origin
+    payloadVersion:"1",metadata,origin,
+    routing:routeConnectorEvent(input)
   };
 }
 function broadcast(e) {
@@ -156,11 +158,12 @@ const server = http.createServer(async (req,res) => {
       broadcast(githubEvent(payload,req.headers,deliveryId));
       return json(res,202,{accepted:true},origin);
     }
-    if (req.method === "GET" && req.url === "/api/telemetry/history") {
+    if (req.method === "GET" && (req.url === "/api/telemetry/history" || req.url === "/api/connectors")) {
       if (origin && !allowedOrigins.includes(origin))
         return json(res,403,{error:"origin_not_allowed"},origin);
       if (!verifySession(req.headers.authorization?.replace(/^Bearer /,""),origin))
         return json(res,401,{error:"unauthorized"},origin);
+      if (req.url === "/api/connectors") return json(res,200,{connectors:listConnectors({githubWebhookConfigured:!!webhookSecret}),mode},origin);
       return json(res,200,{events:history.slice(),mode},origin);
     }
     return json(res,404,{error:"not_found"},origin);
