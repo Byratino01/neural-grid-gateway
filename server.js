@@ -22,7 +22,7 @@ function json(res, status, value, origin = "") {
   res.end(JSON.stringify(value));
 }
 function safe(value, max = 120) {
-  return String(value ?? "").replace(/[<>\\u0000-\\u001f]/g, "").slice(0, max);
+  return String(value ?? "").replace(/[<>\x00-\x1f]/g, "").slice(0, max);
 }
 function telemetry(input, origin) {
   const metadata = {};
