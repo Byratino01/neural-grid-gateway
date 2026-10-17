@@ -29,7 +29,7 @@ function safe(value, max = 120) {
 }
 function telemetry(input, origin) {
   const metadata = {};
-  for (const key of ["repository","action","ref","workflow","conclusion","deliveryId"]) {
+  for (const key of ["repository","action","ref","workflow","conclusion","deliveryId","runId","status"]) {
     if (input.metadata?.[key] != null) metadata[key] = safe(input.metadata[key], 120);
   }
   return {
@@ -103,11 +103,14 @@ function githubEvent(payload, headers, deliveryId) {
   const repo = safe(payload.repository?.full_name || "", 120);
   const workflow = safe(payload.workflow?.name || payload.workflow_run?.name || "", 120);
   const conclusion = safe(payload.workflow_run?.conclusion || "", 60);
+  const runId = payload.workflow_run?.id;
+  const status = safe(payload.workflow_run?.status || "", 40);
   return telemetry({
     type:kind === "workflow_run" ? "github.workflow." + (conclusion || action) : "github." + kind + "." + action,
     source:"github",destination:"neural-grid",
     correlationId:deliveryId,
-    metadata:{repository:repo,action,ref:payload.ref || "",workflow,conclusion,deliveryId}
+    metadata:{repository:repo,action,ref:payload.ref || "",workflow,conclusion,deliveryId,
+      ...(Number.isSafeInteger(runId)&&runId>0?{runId:String(runId)}:{}),status}
   },"external");
 }
 function isDuplicate(id) {
