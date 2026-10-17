@@ -8,7 +8,9 @@ services:
     envVars:
       - key: GITHUB_WEBHOOK_SECRET
         sync: false
-      - key: TELEMETRY_VIEWER_TOKEN
+      - key: TELEMETRY_SESSION_ISSUER_KEY
+        sync: false
+      - key: TELEMETRY_SESSION_SIGNING_KEY
         sync: false
       - key: CORS_ORIGIN
         sync: false
