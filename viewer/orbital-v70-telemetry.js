@@ -17,7 +17,7 @@ export function createTelemetryAdapter({baseUrl,origin,requestSession,onState,on
       const token=await requestSession();
       if(stopped||attempt!==epoch)return;
       if(typeof token!=="string"||!token)throw Error("Session unavailable");
-      const response=await fetchFn(baseUrl+"/api/connectors",{headers:{...authHeaders(token),origin},cache:"no-store"});
+      const response=await fetchFn(baseUrl+"/api/connectors",{headers:authHeaders(token),cache:"no-store"});
       if(!response.ok)throw Error("Registry HTTP "+response.status);
       const registry=await response.json();
       if(stopped||attempt!==epoch)return;
