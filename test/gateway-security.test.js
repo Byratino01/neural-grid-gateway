@@ -21,7 +21,7 @@ async function withGateway(run) {
   const child=spawn(process.execPath,["server.js"],{
     cwd:process.cwd(),
     env:{...process.env,PORT:String(port),GITHUB_WEBHOOK_SECRET:secret,
-      TELEMETRY_VIEWER_TOKEN:token,CORS_ORIGIN:"https://viewer.example",
+      TELEMETRY_SESSION_ISSUER_KEY:"issuer-test-key",TELEMETRY_SESSION_SIGNING_KEY:"signing-test-key",CORS_ORIGIN:"https://viewer.example",
       GATEWAY_TOKEN:"execution-token",OPENAI_API_KEY:"fake",NEURAL_GRID_MODE:"execution"},
     stdio:"ignore"
   });
@@ -36,7 +36,15 @@ async function withGateway(run) {
       await new Promise(resolve=>setTimeout(resolve,50));
     }
     assert.ok(ready,"gateway failed to start");
-    await run({url:`http://127.0.0.1:${port}`,port,secret,token});
+    const issue=async(origin="https://viewer.example")=>{
+      const r=await fetch(`http://127.0.0.1:${port}/api/telemetry/sessions`,{
+        method:"POST",headers:{authorization:"Bearer issuer-test-key","content-type":"application/json"},
+        body:JSON.stringify({origin})
+      });
+      assert.equal(r.status,201);
+      return (await r.json()).token;
+    };
+    await run({issue,url:`http://127.0.0.1:${port}`,port,secret,token});
   } finally {
     child.kill();
     if(child.exitCode===null)await Promise.race([once(child,"exit"),new Promise(resolve=>setTimeout(resolve,1000))]);
@@ -62,18 +70,19 @@ test("execution disabled even when environment requests execution",async()=>{
   });
 });
 test("history endpoint rejects unauthenticated and invalid credentials",async()=>{
-  await withGateway(async({url,token})=>{
+  await withGateway(async({url,issue})=>{
     assert.equal((await fetch(url+"/api/telemetry/history")).status,401);
-    assert.equal((await fetch(url+"/api/telemetry/history",{headers:{"x-telemetry-token":"wrong"}})).status,401);
-    const ok=await fetch(url+"/api/telemetry/history",{headers:{"x-telemetry-token":token}});
+    assert.equal((await fetch(url+"/api/telemetry/history",{headers:{authorization:"Bearer wrong",origin:"https://viewer.example"}})).status,401);
+    const session=await issue();
+    const ok=await fetch(url+"/api/telemetry/history",{headers:{authorization:"Bearer "+session,origin:"https://viewer.example"}});
     assert.equal(ok.status,200);
     assert.deepEqual((await ok.json()).events,[]);
-    const badOrigin=await fetch(url+"/api/telemetry/history",{headers:{"x-telemetry-token":token,origin:"https://attacker.example"}});
+    const badOrigin=await fetch(url+"/api/telemetry/history",{headers:{authorization:"Bearer "+session,origin:"https://attacker.example"}});
     assert.equal(badOrigin.status,403);
   });
 });
 test("signed webhook emits sanitized metadata and rejects duplicates",async()=>{
-  await withGateway(async({url,secret,token})=>{
+  await withGateway(async({url,secret,issue})=>{
     const payload={action:"completed",repository:{full_name:"org/example"},workflow_run:{name:"CI",conclusion:"success"}};
     const first=await webhook({url,secret,delivery:"delivery-123456",payload});
     assert.equal(first.status,202);
@@ -82,7 +91,8 @@ test("signed webhook emits sanitized metadata and rejects duplicates",async()=>{
     assert.equal((await again.json()).duplicate,true);
     const bad=await webhook({url,secret,delivery:"delivery-999999",payload,valid:false});
     assert.equal(bad.status,401);
-    const history=await (await fetch(url+"/api/telemetry/history",{headers:{"x-telemetry-token":token}})).json();
+    const session=await issue();
+    const history=await (await fetch(url+"/api/telemetry/history",{headers:{authorization:"Bearer "+session,origin:"https://viewer.example"}})).json();
     assert.equal(history.events.length,1);
     assert.equal(history.events[0].type,"github.workflow.success");
     assert.equal(history.events[0].metadata.repository,"org/example");
@@ -91,7 +101,7 @@ test("signed webhook emits sanitized metadata and rejects duplicates",async()=>{
   });
 });
 test("websocket refuses missing token and accepts valid scoped subscription",async()=>{
-  await withGateway(async({port,token})=>{
+  await withGateway(async({port,issue})=>{
     const connect=(protocols)=>new Promise(resolve=>{
       const ws=new WebSocket(`ws://127.0.0.1:${port}/events`,protocols,{origin:"https://viewer.example",handshakeTimeout:2000});
       ws.once("message",message=>{ws.close();resolve({ok:true,event:JSON.parse(String(message))});});
@@ -99,8 +109,25 @@ test("websocket refuses missing token and accepts valid scoped subscription",asy
       ws.once("close",()=>resolve({ok:false}));
     });
     assert.equal((await connect(["neural-grid-telemetry-v1"])).ok,false);
-    const accepted=await connect(["neural-grid-telemetry-v1","ng-auth."+token]);
+    const session=await issue();
+    const accepted=await connect(["neural-grid-telemetry-v1","ng-auth."+session]);
     assert.equal(accepted.ok,true);
     assert.equal(accepted.event.type,"connector.connected");
+  });
+});
+
+test("session issuance is server-only and bound to approved origin",async()=>{
+  await withGateway(async({url,issue})=>{
+    const denied=await fetch(url+"/api/telemetry/sessions",{method:"POST",
+      headers:{"content-type":"application/json",origin:"https://viewer.example"},
+      body:JSON.stringify({origin:"https://viewer.example"})});
+    assert.equal(denied.status,401);
+    const token=await issue();
+    const deniedOrigin=await fetch(url+"/api/telemetry/history",{headers:{
+      authorization:"Bearer "+token,origin:"https://attacker.example"}});
+    assert.equal(deniedOrigin.status,403);
+    const malformed=await fetch(url+"/api/telemetry/history",{headers:{
+      authorization:"Bearer "+token+"corrupt",origin:"https://viewer.example"}});
+    assert.equal(malformed.status,401);
   });
 });
