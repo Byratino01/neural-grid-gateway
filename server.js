@@ -6,7 +6,9 @@ import {WebSocketServer} from "ws";
 const mode = "monitor";
 const port = Number(process.env.PORT || 10000);
 const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET || "";
-const viewerToken = process.env.TELEMETRY_VIEWER_TOKEN || "";
+const sessionIssuerKey = process.env.TELEMETRY_SESSION_ISSUER_KEY || "";
+const sessionSigningKey = process.env.TELEMETRY_SESSION_SIGNING_KEY || "";
+const sessionTtlSeconds = 120;
 const allowedOrigins = (process.env.CORS_ORIGIN || "").split(",").map(x => x.trim()).filter(Boolean);
 const clients = new Set();
 const maxBody = 200000;
@@ -60,6 +62,29 @@ function validToken(a, b) {
   const y = crypto.createHash("sha256").update(b).digest();
   return crypto.timingSafeEqual(x, y);
 }
+function b64(data) { return Buffer.from(data).toString("base64url"); }
+function issueSession(origin) {
+  if (!sessionSigningKey || !origin || !allowedOrigins.includes(origin)) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const payload = b64(JSON.stringify({v:1,scope:"telemetry:read",aud:"neural-grid",origin,iat:now,exp:now+sessionTtlSeconds,nonce:crypto.randomBytes(12).toString("hex")}));
+  const signature = crypto.createHmac("sha256",sessionSigningKey).update(payload).digest("base64url");
+  return {token:payload+"."+signature,expiresIn:sessionTtlSeconds};
+}
+function verifySession(token, origin) {
+  if (!sessionSigningKey || !origin || !allowedOrigins.includes(origin) || typeof token !== "string" || token.length > 2048) return false;
+  const parts=token.split(".");
+  if (parts.length !== 2 || !/^[A-Za-z0-9_-]+$/.test(parts[0]) || !/^[A-Za-z0-9_-]+$/.test(parts[1])) return false;
+  const expected=crypto.createHmac("sha256",sessionSigningKey).update(parts[0]).digest();
+  const provided=Buffer.from(parts[1],"base64url");
+  if (expected.length !== provided.length || !crypto.timingSafeEqual(expected,provided)) return false;
+  try {
+    const p=JSON.parse(Buffer.from(parts[0],"base64url").toString("utf8"));
+    const now=Math.floor(Date.now()/1000);
+    return p.v===1 && p.scope==="telemetry:read" && p.aud==="neural-grid" &&
+      p.origin===origin && Number.isSafeInteger(p.iat) && Number.isSafeInteger(p.exp) &&
+      p.iat<=now && p.exp>now && p.exp-p.iat<=sessionTtlSeconds;
+  } catch {return false;}
+}
 async function readBody(req) {
   const chunks = [];
   let size = 0;
@@ -99,7 +124,7 @@ const server = http.createServer(async (req,res) => {
       res.writeHead(204,{
         "access-control-allow-origin":origin,
         "access-control-allow-methods":"GET, POST, OPTIONS",
-        "access-control-allow-headers":"content-type, x-telemetry-token",
+        "access-control-allow-headers":"content-type, authorization",
         "vary":"origin"
       });
       return res.end();
@@ -108,6 +133,15 @@ const server = http.createServer(async (req,res) => {
       return json(res,200,{ok:true,service:"neural-grid-gateway",mode,executionEnabled:false},origin);
     if (req.method === "POST" && req.url === "/api/openai/task")
       return json(res,403,{error:"execution_disabled",mode},origin);
+    if (req.method === "POST" && req.url === "/api/telemetry/sessions") {
+      // Only a trusted backend may issue sessions; never expose the issuer key in browser JS.
+      if (origin || !validToken(sessionIssuerKey,req.headers.authorization?.replace(/^Bearer /,"")))
+        return json(res,401,{error:"unauthorized"});
+      const input=JSON.parse((await readBody(req)).toString("utf8"));
+      const issued=issueSession(input.origin);
+      if (!issued) return json(res,403,{error:"origin_not_allowed"});
+      return json(res,201,issued);
+    }
     if (req.method === "POST" && req.url === "/webhooks/github") {
       const raw = await readBody(req);
       if (!validSignature(raw,req.headers["x-hub-signature-256"]))
@@ -123,7 +157,7 @@ const server = http.createServer(async (req,res) => {
       return json(res,202,{accepted:true},origin);
     }
     if (req.method === "GET" && req.url === "/api/telemetry/history") {
-      if (!validToken(viewerToken,req.headers["x-telemetry-token"]))
+      if (!verifySession(req.headers.authorization?.replace(/^Bearer /,""),origin))
         return json(res,401,{error:"unauthorized"},origin);
       if (origin && !allowedOrigins.includes(origin))
         return json(res,403,{error:"origin_not_allowed"},origin);
@@ -145,7 +179,7 @@ server.on("upgrade",(req,socket,head) => {
   // as a second subprotocol; never log this header or put the token in a URL.
   const protocols = String(req.headers["sec-websocket-protocol"] || "").split(",").map(x=>x.trim());
   const supplied = protocols.find(x=>x.startsWith("ng-auth."))?.slice(8);
-  if (!validToken(viewerToken,supplied) || !protocols.includes("neural-grid-telemetry-v1"))
+  if (!verifySession(supplied,origin) || !protocols.includes("neural-grid-telemetry-v1"))
     return socket.destroy();
   wss.handleUpgrade(req,socket,head,ws=>wss.emit("connection",ws));
 });
