@@ -184,12 +184,17 @@ server.on("upgrade",(req,socket,head) => {
   const supplied = protocols.find(x=>x.startsWith("ng-auth."))?.slice(8);
   if (!verifySession(supplied,origin) || !protocols.includes("neural-grid-telemetry-v1"))
     return socket.destroy();
-  wss.handleUpgrade(req,socket,head,ws=>wss.emit("connection",ws));
+  // Enforce expiry after handshake, not only at authentication.
+  const payload=JSON.parse(Buffer.from(supplied.split(".")[0],"base64url").toString("utf8"));
+  wss.handleUpgrade(req,socket,head,ws=>wss.emit("connection",ws,payload.exp));
 });
-wss.on("connection",ws => {
+wss.on("connection",(ws,expiresAt) => {
+  const remainingMs=Math.max(0,expiresAt*1000-Date.now());
+  const expiryTimer=setTimeout(()=>ws.close(1008,"Session expired"),remainingMs);
+  expiryTimer.unref?.();
   clients.add(ws);
   ws.send(JSON.stringify(telemetry({type:"connector.connected",source:"neural-grid-gateway"},"internal")));
-  ws.on("close",()=>clients.delete(ws));
-  ws.on("error",()=>clients.delete(ws));
+  ws.on("close",()=>{clearTimeout(expiryTimer);clients.delete(ws);});
+  ws.on("error",()=>{clearTimeout(expiryTimer);clients.delete(ws);});
 });
 server.listen(port,()=>console.log("gateway listening on "+port));
