@@ -157,10 +157,10 @@ const server = http.createServer(async (req,res) => {
       return json(res,202,{accepted:true},origin);
     }
     if (req.method === "GET" && req.url === "/api/telemetry/history") {
-      if (!verifySession(req.headers.authorization?.replace(/^Bearer /,""),origin))
-        return json(res,401,{error:"unauthorized"},origin);
       if (origin && !allowedOrigins.includes(origin))
         return json(res,403,{error:"origin_not_allowed"},origin);
+      if (!verifySession(req.headers.authorization?.replace(/^Bearer /,""),origin))
+        return json(res,401,{error:"unauthorized"},origin);
       return json(res,200,{events:history.slice(),mode},origin);
     }
     return json(res,404,{error:"not_found"},origin);
