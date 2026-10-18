@@ -1,0 +1,7 @@
+/* V80: local-first manual connection; no automatic network activity. */
+#v80-connection-settings{margin:9px 0 6px}
+#v80-connection-settings label{font:10px monospace;color:#b7cfdd}
+#v80-connection-settings input{box-sizing:border-box;width:100%;min-width:0;border:1px solid rgba(125,185,218,.32);background:rgba(0,8,18,.55);color:#d9f4ff;padding:6px 7px;border-radius:3px;font:10px monospace}
+#v80-connection-settings small{color:#8fa9b8;font:9px/1.4 monospace}
+#v71-controls button:not(:disabled){cursor:pointer}
+#v71-controls button:first-child:not(:disabled){border-color:#4bacc9;background:rgba(17,73,94,.55)}

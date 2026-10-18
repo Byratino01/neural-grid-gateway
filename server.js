@@ -1,5 +1,8 @@
 import http from "node:http";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import {fileURLToPath} from "node:url";
 import {WebSocketServer} from "ws";
 import {listConnectors,routeConnectorEvent} from "./connector-registry.js";
 
@@ -18,6 +21,8 @@ const maxHistory = 200;
 const history = [];
 const deliveries = new Map();
 const replayTtl = 24 * 60 * 60 * 1000;
+const viewerRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "viewer", "v88.8");
+const contentTypes = {".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8",".svg":"image/svg+xml",".ico":"image/x-icon",".png":"image/png",".jpg":"image/jpeg",".glb":"model/gltf-binary",".woff2":"font/woff2"};
 
 function json(res, status, value, origin = "") {
   const headers = {"content-type":"application/json","cache-control":"no-store"};
@@ -122,6 +127,22 @@ function isDuplicate(id) {
   if (deliveries.size > 10000) deliveries.delete(deliveries.keys().next().value);
   return false;
 }
+function serveViewer(req,res) {
+  let pathname;
+  try { pathname = new URL(req.url,"http://gateway.local").pathname; } catch { return false; }
+  const requestPath = pathname === "/viewer" || pathname === "/viewer/" ? "/v70.html" : pathname.slice("/viewer/".length);
+  let decoded;
+  try { decoded = decodeURIComponent(requestPath); } catch { return false; }
+  if (!decoded || decoded.includes("\0") || decoded.includes("..") || decoded.split(/[\\/]/).some(part=>part.startsWith("."))) return false;
+  const filePath = path.resolve(viewerRoot, decoded.replace(/^[/\\]+/, ""));
+  if (filePath !== viewerRoot && !filePath.startsWith(viewerRoot + path.sep)) return false;
+  try {
+    const body = fs.readFileSync(filePath);
+    res.writeHead(200,{"content-type":contentTypes[path.extname(filePath).toLowerCase()] || "application/octet-stream","cache-control":"no-store"});
+    res.end(body);
+    return true;
+  } catch { return false; }
+}
 const server = http.createServer(async (req,res) => {
   const origin = String(req.headers.origin || "");
   try {
@@ -137,6 +158,8 @@ const server = http.createServer(async (req,res) => {
     }
     if (req.method === "GET" && req.url === "/health")
       return json(res,200,{ok:true,service:"neural-grid-gateway",mode,executionEnabled:false},origin);
+    if (req.method === "GET" && (req.url === "/viewer" || req.url.startsWith("/viewer/")))
+      return serveViewer(req,res) ? undefined : json(res,404,{error:"not_found"},origin);
     if (req.method === "POST" && req.url === "/api/openai/task")
       return json(res,403,{error:"execution_disabled",mode},origin);
     if (req.method === "POST" && req.url === "/api/telemetry/sessions") {

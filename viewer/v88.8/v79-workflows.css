@@ -1,0 +1,7 @@
+/* V79: existing HTML controls only; no GLB or camera changes. */
+#stations button[data-id="github"],#v71-connectors [data-connector="github"]{position:relative;--workflow-pulse-period:2200ms}
+#stations button[data-id="github"][data-workflow-status="active"]::after,#v71-connectors [data-connector="github"][data-workflow-status="active"]::after{content:"";position:absolute;inset:-3px;border:1px solid #54c8fa;border-radius:inherit;pointer-events:none;animation:ng-v79-pulse var(--workflow-pulse-period) ease-in-out infinite}
+#stations button[data-id="github"][data-workflow-status="uncertain"]::after,#v71-connectors [data-connector="github"][data-workflow-status="uncertain"]::after{content:"";position:absolute;inset:-3px;border:1px dashed #efb75b;border-radius:inherit;pointer-events:none}
+.v79-count{display:inline-block;margin-left:6px;min-width:1.5em;padding:1px 4px;border:1px solid #437489;border-radius:8px;color:#b8eafa;font:600 11px monospace}
+@keyframes ng-v79-pulse{0%,100%{opacity:.35;box-shadow:0 0 2px #54c8fa44}50%{opacity:1;box-shadow:0 0 14px #54c8faaa}}
+@media(prefers-reduced-motion:reduce){#stations button[data-workflow-status="active"]::after,#v71-connectors [data-workflow-status="active"]::after{animation:none}}
