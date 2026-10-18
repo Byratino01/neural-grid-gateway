@@ -194,7 +194,10 @@ const overlaps = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 &&
     await authPage.locator('#v80-gateway').fill(gatewayOrigin);
     await authPage.locator('#v80-token').fill(issued.token);
     await authPage.locator('#v71-connect').click();
-    await authPage.locator('#v71-state').filter({hasText:'CONNECTED'}).waitFor({timeout:10000});
+    await authPage.waitForFunction(()=>['connected','error'].includes(
+      document.querySelector('#v71-state')?.dataset.state),null,{timeout:15000});
+    assert.equal(await authPage.locator('#v71-state').getAttribute('data-state'),'connected',
+      'manual token connection failed: '+await authPage.locator('#v71-detail').innerText());
     await authPage.locator('#v71-last-event').filter({hasText:'github.workflow.success'}).waitFor({timeout:10000});
     assert.equal(await authPage.locator('#v80-token').inputValue(),'','manual token field cleared');
     assert.equal(await authPage.evaluate(token=>localStorage.getItem('telemetryToken')===token||
