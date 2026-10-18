@@ -8,7 +8,7 @@ test("V75 tracks three concurrent GitHub workflows independently",()=>{
  const event=(id,runId,status,conclusion="")=>({
   schema:"neural-grid/event/v1",eventId:id,source:"github",
   type:"github.workflow."+ (conclusion||status),
-  metadata:{runId:String(runId),status,conclusion}
+  metadata:{repository:"org/example",runId:String(runId),status,conclusion}
  });
  for(let n=1;n<=3;n++)assert.equal(a.ingest(event("start-"+n,n,"in_progress")),true);
  assert.equal(a.snapshot().activeCount,3);
@@ -27,9 +27,9 @@ test("V75 never invents run IDs or keeps stale workflow activity as confirmed",(
  let clock=0;
  const a=createWorkflowActivity({now:()=>clock,staleAfterMs:100});
  assert.equal(a.ingest({schema:"neural-grid/event/v1",eventId:"missing",source:"github",
-  type:"github.workflow.in_progress",metadata:{status:"in_progress"}}),false);
+  type:"github.workflow.in_progress",metadata:{repository:"org/example",status:"in_progress"}}),false);
  assert.equal(a.ingest({schema:"neural-grid/event/v1",eventId:"start",source:"github",
-  type:"github.workflow.in_progress",metadata:{runId:"456",status:"in_progress"}}),true);
+  type:"github.workflow.in_progress",metadata:{repository:"org/example",runId:"456",status:"in_progress"}}),true);
  clock=101;
  assert.equal(a.snapshot().activeCount,0);
  assert.equal(a.snapshot().uncertainCount,1);

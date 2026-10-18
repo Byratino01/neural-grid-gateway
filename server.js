@@ -9,7 +9,8 @@ const port = Number(process.env.PORT || 10000);
 const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET || "";
 const sessionIssuerKey = process.env.TELEMETRY_SESSION_ISSUER_KEY || "";
 const sessionSigningKey = process.env.TELEMETRY_SESSION_SIGNING_KEY || "";
-const sessionTtlSeconds = 120;
+// V88 staging policy: short-lived, read-only telemetry sessions.
+const sessionTtlSeconds = 900;
 const allowedOrigins = (process.env.CORS_ORIGIN || "").split(",").map(x => x.trim()).filter(Boolean);
 const clients = new Set();
 const maxBody = 200000;

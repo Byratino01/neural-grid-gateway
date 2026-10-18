@@ -12,7 +12,7 @@ test("V78 viewer GitHub HUD reflects 3 running, then 2, then idle",()=>{
  const event=(eventId,runId,status,conclusion="")=>({
   schema:"neural-grid/event/v1",eventId,source:"github",
   type:"github.workflow."+(conclusion||status),
-  metadata:{runId:String(runId),status,conclusion}});
+  metadata:{repository:"org/example",runId:String(runId),status,conclusion}});
  assert.equal(c.refresh().visual.activeCount,0);
  for(let i=1;i<=3;i++)assert.equal(c.ingest(event("start-"+i,i,"in_progress")),true);
  assert.equal(count.textContent,"3");

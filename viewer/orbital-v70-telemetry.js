@@ -23,6 +23,11 @@ export function createTelemetryAdapter({baseUrl,origin,requestSession,onState,on
       if(stopped||attempt!==epoch)return;
       state.connectors=Array.isArray(registry.connectors)?registry.connectors:[];
       publish();
+      const historyResponse=await fetchFn(baseUrl+"/api/telemetry/history",{headers:authHeaders(token),cache:"no-store"});
+      if(!historyResponse.ok)throw Error("History HTTP "+historyResponse.status);
+      const history=await historyResponse.json();
+      if(stopped||attempt!==epoch)return;
+      if(Array.isArray(history.events))for(const event of history.events)onEvent?.(event);
       const url=baseUrl.replace(/^https:/,"wss:")+"/events";
       socket=new WebSocketClass(url,["neural-grid-telemetry-v1","ng-auth."+token]);
       socket.onopen=()=>{if(!stopped&&attempt===epoch){state.status="connected";publish();}};

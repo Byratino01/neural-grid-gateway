@@ -42,7 +42,11 @@ async function withGateway(run) {
         body:JSON.stringify({origin})
       });
       assert.equal(r.status,201);
-      return (await r.json()).token;
+      const body=await r.json();
+      assert.equal(body.expiresIn,900);
+      const payload=JSON.parse(Buffer.from(body.token.split(".")[0],"base64url").toString("utf8"));
+      assert.equal(payload.exp-payload.iat,900);
+      return body.token;
     };
     await run({issue,url:`http://127.0.0.1:${port}`,port,secret,token});
   } finally {
