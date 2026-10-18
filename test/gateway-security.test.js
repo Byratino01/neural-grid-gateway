@@ -88,6 +88,11 @@ test("history endpoint rejects unauthenticated and invalid credentials",async()=
     assert.deepEqual((await ok.json()).events,[]);
     const badOrigin=await fetch(url+"/api/telemetry/history",{headers:{authorization:"Bearer "+session,origin:"https://attacker.example"}});
     assert.equal(badOrigin.status,403);
+    const sameOrigin=await fetch(url+"/api/telemetry/history",{headers:{authorization:"Bearer "+session,
+      referer:"https://viewer.example/", "sec-fetch-site":"same-origin"}});
+    assert.equal(sameOrigin.status,200,"same-origin browser GET may authenticate through Fetch Metadata and Referer");
+    const noOriginContext=await fetch(url+"/api/telemetry/history",{headers:{authorization:"Bearer "+session}});
+    assert.equal(noOriginContext.status,401,"missing origin and same-origin context rejected");
   });
 });
 test("signed webhook emits sanitized metadata and rejects duplicates",async()=>{
