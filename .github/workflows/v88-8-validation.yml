@@ -1,0 +1,58 @@
+name: V88.8 viewer and gateway validation
+on:
+  push:
+    branches: [feature/monitor-mode-gateway-v2]
+  pull_request:
+    branches: [feature/monitor-mode-gateway-v2]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Check JavaScript syntax
+        run: |
+          node --check server.js
+          for file in viewer/v88.8/*.js; do node --check "$file"; done
+      - name: Run gateway, security, telemetry, and static serving tests
+        run: npm test
+      - name: Install Chromium test runner
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+      - name: Start gateway for browser validation
+        env:
+          PORT: 18765
+          GITHUB_WEBHOOK_SECRET: ci-webhook-secret
+          TELEMETRY_SESSION_ISSUER_KEY: ci-issuer-key
+          TELEMETRY_SESSION_SIGNING_KEY: ci-signing-key
+          CORS_ORIGIN: http://127.0.0.1:18765
+        run: |
+          nohup node server.js > gateway-ci.log 2>&1 &
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:18765/health >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat gateway-ci.log
+          exit 1
+      - name: Run V88.8 Chromium layout checks at five viewports
+        env:
+          V88_6_URL: http://127.0.0.1:18765/viewer/v70.html?fixture=1
+        run: node viewer/v88.8/test_v88_8_layout.cjs
+      - name: Save validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v88-8-validation-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            gateway-ci.log
+            viewer/v88.8/V88.8-screenshots/**
