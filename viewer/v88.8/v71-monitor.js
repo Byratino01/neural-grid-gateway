@@ -17,12 +17,7 @@ const config = window.__NG_MONITOR_CONFIG;
 // minted by a trusted server. No connection is initiated without a click.
 let pendingToken='';
 function gatewayUrl(){return (gatewayInput?.value||config?.baseUrl||'').trim();}
-function providerAvailable(){return location.origin==='http://127.0.0.1:50080' || Boolean(config&&typeof config.requestSession==='function');}
-async function localSession(){
- const response=await fetch('/api/monitor/session',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',cache:'no-store',credentials:'same-origin'});
- if(!response.ok) throw Error('Local issuer unavailable ('+response.status+'). Configure it in PowerShell, not Chrome.');
- return response.json();
-}
+function providerAvailable(){return Boolean(config&&typeof config.requestSession==='function');}
 
 const rows = new Map(), known = new Map();
 let socket = null, attempt = 0, active = false, sessionTimer = null, countdownTimer = null, expiresAt = 0;
@@ -36,7 +31,7 @@ function status(value, explanation) {
 }
 function validConfig() {
   if (!gatewayUrl()) return false;
-  try { const u = new URL(gatewayUrl()); return u.protocol === 'https:' && !u.username && !u.password && u.pathname === '/' && !u.search && !u.hash; }
+  try { const u = new URL(gatewayUrl()); const localHttp=u.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(u.hostname);return (u.protocol === 'https:'||localHttp) && !u.username && !u.password && u.pathname === '/' && !u.search && !u.hash; }
   catch { return false; }
 }
 function addRow(id, name) {
@@ -104,10 +99,11 @@ function disconnect() {
 async function connect() {
   if (active) return;
   if (!validConfig()){status('error','Enter a valid HTTPS gateway address.');return;}
-  if (!providerAvailable() && !tokenInput?.value.trim()){status('disconnected','Enter a short-lived session token from a trusted issuer to connect. No network request was made.');return;}
-  const ticket=++attempt; active=true; status('connecting','Requesting short-lived read-only session from trusted backend.');
+  const manualToken=tokenInput?.value.trim()||'';
+  if (!manualToken&&!providerAvailable()){status('disconnected','Enter a short-lived session token from a trusted issuer to connect. No network request was made.');return;}
+  const ticket=++attempt; active=true; status('connecting',manualToken?'Using the manually supplied short-lived read-only session.':'Requesting short-lived read-only session from the configured trusted provider.');
   try {
-    const credential=location.origin==='http://127.0.0.1:50080'?await localSession():(providerAvailable()?await config.requestSession():tokenInput.value.trim());
+    const credential=manualToken||await config.requestSession();
     if(tokenInput)tokenInput.value=''; // never retain token in a form field
     if (ticket!==attempt) return;
     const token=typeof credential==='string'?credential:credential?.token;
@@ -149,3 +145,4 @@ start.addEventListener('click',connect);stop.addEventListener('click',disconnect
 status('disconnected','Manual mode. Press Connect to request a temporary read-only session. No external connections are active.');
 window.addEventListener('pagehide',disconnect,{once:true});
 })();
+

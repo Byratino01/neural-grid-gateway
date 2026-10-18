@@ -61,6 +61,11 @@ function webhook({url,secret,delivery,payload,valid=true}) {
     headers:{"content-type":"application/json","x-hub-signature-256":"sha256="+digest,
       "x-github-delivery":delivery,"x-github-event":"workflow_run"},body:raw});
 }
+function signedSession(claims,key="signing-test-key") {
+  const payload=Buffer.from(JSON.stringify(claims)).toString("base64url");
+  const signature=crypto.createHmac("sha256",key).update(payload).digest("base64url");
+  return payload+"."+signature;
+}
 test("execution disabled even when environment requests execution",async()=>{
   await withGateway(async({url})=>{
     const health=await (await fetch(url+"/health")).json();
@@ -122,10 +127,20 @@ test("websocket refuses missing token and accepts valid scoped subscription",asy
 
 test("session issuance is server-only and bound to approved origin",async()=>{
   await withGateway(async({url,issue})=>{
+    const missingKey=await fetch(url+"/api/telemetry/sessions",{method:"POST",
+      headers:{"content-type":"application/json"},body:JSON.stringify({origin:"https://viewer.example"})});
+    assert.equal(missingKey.status,401,"missing issuer credentials rejected");
+    const invalidKey=await fetch(url+"/api/telemetry/sessions",{method:"POST",
+      headers:{authorization:"Bearer invalid","content-type":"application/json"},body:JSON.stringify({origin:"https://viewer.example"})});
+    assert.equal(invalidKey.status,401,"invalid issuer credentials rejected");
     const denied=await fetch(url+"/api/telemetry/sessions",{method:"POST",
       headers:{"content-type":"application/json",origin:"https://viewer.example"},
       body:JSON.stringify({origin:"https://viewer.example"})});
     assert.equal(denied.status,401);
+    const issuanceOriginDenied=await fetch(url+"/api/telemetry/sessions",{method:"POST",
+      headers:{authorization:"Bearer issuer-test-key","content-type":"application/json"},
+      body:JSON.stringify({origin:"https://attacker.example"})});
+    assert.equal(issuanceOriginDenied.status,403,"disallowed viewer origin rejected");
     const token=await issue();
     const deniedOrigin=await fetch(url+"/api/telemetry/history",{headers:{
       authorization:"Bearer "+token,origin:"https://attacker.example"}});
@@ -135,3 +150,22 @@ test("session issuance is server-only and bound to approved origin",async()=>{
     assert.equal(malformed.status,401);
   });
 });
+
+test("session scope, signature, and server-side expiration are enforced",async()=>{
+  await withGateway(async({url,issue})=>{
+    const valid=await issue();
+    const claims=JSON.parse(Buffer.from(valid.split(".")[0],"base64url").toString("utf8"));
+    assert.equal(claims.scope,"telemetry:read");
+    assert.equal(claims.origin,"https://viewer.example");
+    assert.equal(claims.exp-claims.iat,900);
+    const request=token=>fetch(url+"/api/telemetry/history",{headers:{
+      authorization:"Bearer "+token,origin:"https://viewer.example"}});
+    assert.equal((await request(signedSession({...claims,scope:"telemetry:write"}))).status,401,
+      "write scope is not accepted");
+    assert.equal((await request(signedSession({...claims,exp:Math.floor(Date.now()/1000)-1}))).status,401,
+      "expired token is rejected server-side");
+    assert.equal((await request(valid.slice(0,-1)+(valid.endsWith("A")?"B":"A"))).status,401,
+      "incorrect signature is rejected");
+  });
+});
+

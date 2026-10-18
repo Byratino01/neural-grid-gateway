@@ -161,8 +161,59 @@ const overlaps = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 &&
         externalRequests});
       await page.close();
     }
+
+    // End-to-end manual-token path: trusted operator-side test code issues the
+    // credential; the browser only receives the short-lived viewer token.
+    const gatewayOrigin=new URL(baseUrl).origin;
+    const issuerKey=process.env.TELEMETRY_SESSION_ISSUER_KEY;
+    const webhookSecret=process.env.GITHUB_WEBHOOK_SECRET;
+    assert.ok(issuerKey&&webhookSecret,'CI-only issuer and webhook test configuration');
+    const issuedResponse=await fetch(gatewayOrigin+'/api/telemetry/sessions',{method:'POST',
+      headers:{authorization:'Bearer '+issuerKey,'content-type':'application/json'},
+      body:JSON.stringify({origin:gatewayOrigin})});
+    assert.equal(issuedResponse.status,201,'trusted test operator issues token');
+    const issued=await issuedResponse.json();
+    assert.equal(issued.expiresIn,900,'manual session lifetime');
+    const payload=JSON.stringify({action:'completed',repository:{full_name:'ci/neural-grid'},
+      workflow_run:{id:8844001,name:'V88.8 browser authentication',status:'completed',conclusion:'success'}});
+    const signature=require('node:crypto').createHmac('sha256',webhookSecret).update(payload).digest('hex');
+    const webhookResponse=await fetch(gatewayOrigin+'/webhooks/github',{method:'POST',
+      headers:{'content-type':'application/json','x-hub-signature-256':'sha256='+signature,
+        'x-github-delivery':'v88-8-e2e-0001','x-github-event':'workflow_run'},body:payload});
+    assert.equal(webhookResponse.status,202,'seed authenticated telemetry history');
+    const authPage=await browser.newPage({viewport:{width:1366,height:768}});
+    const browserRequests=[];
+    let telemetrySocketClose;
+    authPage.on('websocket',socket=>{
+      if(socket.url().endsWith('/events'))telemetrySocketClose=new Promise(resolve=>socket.on('close',resolve));
+    });
+    authPage.on('request',request=>browserRequests.push({url:request.url(),headers:request.headers()}));
+    const authPageResponse=await authPage.goto(gatewayOrigin+'/viewer/?fixture=1',{waitUntil:'domcontentloaded'});
+    assert.equal(authPageResponse.status(),200,'staging viewer route');
+    await authPage.locator('#v80-connection-settings').evaluate(element=>element.open=true);
+    await authPage.locator('#v80-gateway').fill(gatewayOrigin);
+    await authPage.locator('#v80-token').fill(issued.token);
+    await authPage.locator('#v71-connect').click();
+    await authPage.locator('#v71-state').filter({hasText:'CONNECTED'}).waitFor({timeout:10000});
+    await authPage.locator('#v71-last-event').filter({hasText:'github.workflow.success'}).waitFor({timeout:10000});
+    assert.equal(await authPage.locator('#v80-token').inputValue(),'','manual token field cleared');
+    assert.equal(await authPage.evaluate(token=>localStorage.getItem('telemetryToken')===token||
+      sessionStorage.getItem('telemetryToken')===token,issued.token),false,'token not persisted');
+    assert.ok(browserRequests.some(request=>request.url===gatewayOrigin+'/api/connectors'),'authenticated connector status loaded');
+    assert.ok(browserRequests.some(request=>request.url===gatewayOrigin+'/api/telemetry/history'),'authenticated history loaded');
+    assert.equal(browserRequests.some(request=>request.url.includes('/api/telemetry/sessions')||request.url.includes('/api/monitor/session')),
+      false,'browser never calls either token issuer endpoint');
+    assert.equal(browserRequests.some(request=>Object.values(request.headers).includes(issuerKey)),false,
+      'browser never receives the issuer key');
+    assert.ok(telemetrySocketClose,'authenticated WebSocket opened');
+    await authPage.locator('#v71-disconnect').click();
+    await authPage.locator('#v71-state').filter({hasText:'DISCONNECTED'}).waitFor();
+    assert.equal(await authPage.locator('#v71-disconnect').isEnabled(),false,'manual Disconnect disables itself');
+    await telemetrySocketClose;
+    await authPage.close();
   } finally {await browser.close(); if(server)await new Promise(resolve=>server.close(resolve))}
   fs.writeFileSync(path.join(output,'layout-report.json'),JSON.stringify(report,null,2));
   for(const row of report) console.log(row.viewport+' PASS · 6 panels · '+row.timelinePoints+' chart points');
   console.log('Browser report: '+path.join(output,'layout-report.json'));
 })().catch(error=>{console.error(error);process.exitCode=1});
+
