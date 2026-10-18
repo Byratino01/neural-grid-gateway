@@ -200,4 +200,4 @@ wss.on("connection",(ws,expiresAt) => {
   ws.on("close",()=>{clearTimeout(expiryTimer);clients.delete(ws);});
   ws.on("error",()=>{clearTimeout(expiryTimer);clients.delete(ws);});
 });
-server.listen(port,()=>console.log("gateway listening on "+port));
+server.listen(port,"0.0.0.0",()=>console.log("gateway listening on 0.0.0.0:"+port));
