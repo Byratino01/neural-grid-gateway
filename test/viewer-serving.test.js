@@ -28,8 +28,8 @@ test("viewer entry and approved local assets are served from the isolated viewer
     const page=await fetch(base+"/viewer/");
     assert.equal(page.status,200);assert.match(page.headers.get("content-type"),/text\/html/);
     assert.match(await page.text(),/id="v70-dashboard"/);
-    for(const [url,type] of [["/viewer/v70-dashboard.css","text/css"],["/viewer/v70-dashboard.js","javascript"],["/viewer/assets/icons/github.svg","image/svg+xml"],["/viewer/vendor/three/build/three.module.js","javascript"]]){
-      const response=await fetch(base+url);assert.equal(response.status,200,url);assert.match(response.headers.get("content-type"),new RegExp(type.replace("/","\\/")),url);
+    for(const [url,type] of [["/viewer/v70-dashboard.css","text/css"],["/viewer/v70-dashboard.js","text/javascript"],["/viewer/assets/icons/github.svg","image/svg+xml"],["/viewer/vendor/three/build/three.module.js","text/javascript"]]){
+      const response=await fetch(base+url);assert.equal(response.status,200,url);assert.ok(response.headers.get("content-type").startsWith(type),url);
     }
   });
 });
