@@ -40,10 +40,14 @@ const overlaps = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 &&
       const page = await browser.newPage({viewport:{width,height},deviceScaleFactor:1});
       const consoleErrors = [];
       const badResponses = [];
+      const glbResponses = [];
       const externalRequests = [];
       page.on('pageerror',error=>consoleErrors.push(error.message));
       page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text())});
-      page.on('response',response=>{if(response.status()>=400)badResponses.push(response.status()+' '+response.url())});
+      page.on('response',response=>{
+        if(response.url().endsWith('/orbital-nexus.glb'))glbResponses.push(response.status());
+        if(response.status()>=400)badResponses.push(response.status()+' '+response.url());
+      });
       page.on('request',request=>{
         const url=request.url();
         if(/^https?:/.test(url)&&new URL(url).origin!==new URL(baseUrl).origin)externalRequests.push(url);
@@ -85,7 +89,8 @@ const overlaps = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 &&
       assert.equal(await page.locator('#v70-map .connection-map').isVisible(),true,'map visible');
       assert.equal(await page.locator('#v70-flow .v88-chart').isVisible(),true,'chart visible');
       assert.deepEqual(externalRequests,[],'fixture must not request external services');
-      assert.ok(badResponses.every(item=>/\/orbital-nexus\.glb$/.test(item)),'no new failed asset requests');
+      assert.deepEqual(glbResponses,[200,200],'bundled GLB HEAD and GET succeed');
+      assert.deepEqual(badResponses,[],'no failed viewer resource responses');
       assert.ok((await page.locator('#v88-flow-points circle').count())>=4,'timestamp points');
       if(width>=1366)for(const [id,content] of [
         ['system','.status-table'],['flow','.v88-chart'],['map','.connection-map']]) {

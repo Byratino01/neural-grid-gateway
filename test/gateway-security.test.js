@@ -169,7 +169,9 @@ test("session scope, signature, and server-side expiration are enforced",async()
       "write scope is not accepted");
     assert.equal((await request(signedSession({...claims,exp:Math.floor(Date.now()/1000)-1}))).status,401,
       "expired token is rejected server-side");
-    assert.equal((await request(valid.slice(0,-1)+(valid.endsWith("A")?"B":"A"))).status,401,
+    const [payload,signature]=valid.split(".");
+    const tamperedSignature=(signature[0]==="A"?"B":"A")+signature.slice(1);
+    assert.equal((await request(payload+"."+tamperedSignature)).status,401,
       "incorrect signature is rejected");
   });
 });

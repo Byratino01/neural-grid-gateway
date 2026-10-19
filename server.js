@@ -149,8 +149,8 @@ function serveViewer(req,res) {
   if (filePath !== viewerRoot && !filePath.startsWith(viewerRoot + path.sep)) return false;
   try {
     const body = fs.readFileSync(filePath);
-    res.writeHead(200,{"content-type":contentTypes[path.extname(filePath).toLowerCase()] || "application/octet-stream","cache-control":"no-store"});
-    res.end(body);
+    res.writeHead(200,{"content-type":contentTypes[path.extname(filePath).toLowerCase()] || "application/octet-stream","content-length":body.length,"cache-control":"no-store"});
+    res.end(req.method === "HEAD" ? undefined : body);
     return true;
   } catch { return false; }
 }
@@ -169,7 +169,7 @@ const server = http.createServer(async (req,res) => {
     }
     if (req.method === "GET" && req.url === "/health")
       return json(res,200,{ok:true,service:"neural-grid-gateway",mode,executionEnabled:false},origin);
-    if (req.method === "GET" && (req.url === "/viewer" || req.url.startsWith("/viewer/")))
+    if ((req.method === "GET" || req.method === "HEAD") && (req.url === "/viewer" || req.url.startsWith("/viewer/")))
       return serveViewer(req,res) ? undefined : json(res,404,{error:"not_found"},origin);
     if (req.method === "POST" && req.url === "/api/openai/task")
       return json(res,403,{error:"execution_disabled",mode},origin);
