@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {spawn} from "node:child_process";
 import {once} from "node:events";
 import net from "node:net";
+import {createHash} from "node:crypto";
 
 async function freePort(){
   const server=net.createServer();server.listen(0,"127.0.0.1");await once(server,"listening");
@@ -31,6 +32,15 @@ test("viewer entry and approved local assets are served from the isolated viewer
     for(const [url,type] of [["/viewer/v70-dashboard.css","text/css"],["/viewer/v70-dashboard.js","text/javascript"],["/viewer/assets/icons/github.svg","image/svg+xml"],["/viewer/vendor/three/build/three.module.js","text/javascript"]]){
       const response=await fetch(base+url);assert.equal(response.status,200,url);assert.ok(response.headers.get("content-type").startsWith(type),url);
     }
+    const head=await fetch(base+"/viewer/orbital-nexus.glb",{method:"HEAD"});
+    assert.equal(head.status,200,"viewer model HEAD request");
+    assert.equal(head.headers.get("content-type"),"model/gltf-binary");
+    assert.equal(head.headers.get("content-length"),"22000596");
+    assert.equal(await head.text(),"","HEAD response has no body");
+    const model=await fetch(base+"/viewer/orbital-nexus.glb");
+    assert.equal(model.status,200,"viewer model GET request");
+    assert.equal(createHash("sha256").update(Buffer.from(await model.arrayBuffer())).digest("hex"),
+      "a64b5e8c90c42132cd3a12c9fa29d21d5803e64890443cfb8bf7ff1645961cf6","gateway serves the approved GLB bytes");
   });
 });
 

@@ -15,6 +15,6 @@ The gateway authenticates the viewer's short-lived read-only session before retu
 
 ## Regression protection
 
-`test/architecture-regression.test.js` pins key scene setup anchors (Three.js controls and loader imports, camera, lighting, damping, bundled GLB URL, and render loop) and ensures that monitor catalog/status semantics stay explicit. These are source regressions checks, not proof of rendered pixel equivalence or successful model loading. The repository references `viewer/v88.8/orbital-nexus.glb`, but that asset is not tracked; the browser validation currently allows the resulting optional asset request failure. The existing five-viewport Playwright check remains the visual/layout behavior check.
+`test/architecture-regression.test.js` pins key scene setup anchors (Three.js controls and loader imports, camera, lighting, damping, bundled GLB URL, and render loop) and ensures that monitor catalog/status semantics stay explicit. `test/approved-glb-integrity.test.js` pins the approved model's SHA-256 and checks its GLB chunks, embedded resources, and core references. `viewer/v88.8/test_v88_8_model_load.cjs` exercises the actual Three.js loader over local HTTP and verifies its loaded mesh/animation report. The five-viewport Playwright check remains the dashboard layout behavior check and requires successful GLB responses.
 
 The gateway tests exercise controlled local fixtures. Do not use a real staging credential or private/third-party target for this validation.

@@ -17,7 +17,7 @@
 - Telemetry adapters live in `viewer/orbital-telemetry-adapter.js` and `viewer/v88.8/orbital-v70-telemetry-v88.js`.
 - Workflow data and panel controllers already have reusable modules: `viewer/github-workflow-activity.js`, `viewer/github-workflow-visual.js`, and `viewer/v88.8/github-dashboard-controller-v88.js`.
 - Existing Node tests and `.github/workflows/gateway-tests.yml` plus `.github/workflows/v88-8-validation.yml` provide server and browser/layout coverage.
-- The main page references `./orbital-nexus.glb`, but no `.glb` or `.gltf` asset is tracked in this repository. The existing browser check tolerates this missing optional asset.
+- At preparation time the main page referenced `./orbital-nexus.glb`, but no model asset was tracked; the approved attachment has since been restored at that path and its fingerprint is recorded in `docs/preservation-baseline.md`.
 
 ## Proposed minimal changes
 1. Keep existing module boundaries and add a concise architecture guide documenting ownership, data flow, and the larger inline page as a future extraction seam rather than restructuring it wholesale.
