@@ -1,10 +1,12 @@
 /* V71 Monitor Mode: browser-only, read-only, no issuer credentials. */
 (function () {
 'use strict';
-const catalog = [
-  ['github','GitHub','github'], ['render','Render','render'],
-  ['netlify','Netlify','netlify'], ['chatgpt','ChatGPT','chatgpt'],
-  ['truck-scanner','Truck Scanner','truck-scanner']
+// The same-origin registry owns connector identity and display names. Keep a
+// tiny fallback so the monitor remains legible if its metadata script fails.
+const catalog = Array.isArray(window.__NG_CONNECTORS) ? window.__NG_CONNECTORS : [
+  {id:'github',name:'GitHub'}, {id:'render',name:'Render'},
+  {id:'netlify',name:'Netlify'}, {id:'chatgpt',name:'ChatGPT'},
+  {id:'truck-scanner',name:'Truck Scanner'}
 ];
 const $ = id => document.getElementById(id);
 const panel = $('v71-monitor');
@@ -41,12 +43,12 @@ function addRow(id, name) {
   const indicator = document.createElement('strong'); indicator.textContent = 'UNCONNECTED';
   row.append(dot,label,indicator); list.append(row); rows.set(id,{row,indicator});
 }
-for (const [id,name] of catalog) addRow(id,name);
+for (const {id,name} of catalog) addRow(id,name);
 function setRow(id, value) {
   const entry = rows.get(id); if (!entry) return;
   entry.row.dataset.status = value; entry.indicator.textContent = value.toUpperCase();
 }
-function clearLive() { document.dispatchEvent(new Event('ng:monitor-reset')); known.clear(); for (const [id] of catalog) setRow(id,'unconnected'); }
+function clearLive() { document.dispatchEvent(new Event('ng:monitor-reset')); known.clear(); for (const {id} of catalog) setRow(id,'unconnected'); }
 function applyRegistry(payload) {
   if (!payload || !Array.isArray(payload.connectors)) throw Error('Invalid connector registry');
   const next = new Map();
@@ -58,7 +60,9 @@ function applyRegistry(payload) {
   clearLive();
   for (const [id,c] of next) {
     known.set(id,c);
-    setRow(id,c.connected === true && c.status === 'connected' ? 'connected' : c.status === 'configured' ? 'configured' : 'unconnected');
+    // Preserve registry state exactly. A configured endpoint is not a live
+    // connection, and errors/disconnections must remain visible to operators.
+    setRow(id,c.status === 'connected' && c.connected !== true ? 'error' : c.status);
   }
 }
 function pulse(id) {
