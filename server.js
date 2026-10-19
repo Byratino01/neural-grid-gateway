@@ -30,17 +30,6 @@ function json(res, status, value, origin = "") {
   res.writeHead(status, headers);
   res.end(JSON.stringify(value));
 }
-function requestOrigin(req) {
-  const origin=String(req.headers.origin||"");
-  if(origin)return origin;
-  // Same-origin browser GETs commonly omit Origin. Accept a viewer origin only
-  // when Fetch Metadata confirms same-origin and Referer resolves to our allowlist.
-  if(req.headers["sec-fetch-site"]!=="same-origin")return "";
-  try {
-    const referrer=new URL(String(req.headers.referer||""));
-    return allowedOrigins.includes(referrer.origin)?referrer.origin:"";
-  } catch {return "";}
-}
 function safe(value, max = 120) {
   return String(value ?? "").replace(/[<>\x00-\x1f]/g, "").slice(0, max);
 }
@@ -155,7 +144,7 @@ function serveViewer(req,res) {
   } catch { return false; }
 }
 const server = http.createServer(async (req,res) => {
-  const origin = requestOrigin(req);
+  const origin = String(req.headers.origin || "");
   try {
     if (req.method === "OPTIONS") {
       if (!origin || !allowedOrigins.includes(origin)) return json(res,403,{error:"origin_not_allowed"});
@@ -236,4 +225,3 @@ wss.on("connection",(ws,expiresAt) => {
   ws.on("error",()=>{clearTimeout(expiryTimer);clients.delete(ws);});
 });
 server.listen(port,"0.0.0.0",()=>console.log("gateway listening on 0.0.0.0:"+port));
-

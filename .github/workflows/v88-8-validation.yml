@@ -1,9 +1,9 @@
 name: V88.8 viewer and gateway validation
 on:
   push:
-    branches: [feature/monitor-mode-gateway-v2]
+    branches: [feature/monitor-mode-gateway-v2, feature/modular-architecture-regression-v1]
   pull_request:
-    branches: [feature/monitor-mode-gateway-v2]
+    branches: [feature/monitor-mode-gateway-v2, feature/modular-architecture-regression-v1]
   workflow_dispatch:
 permissions:
   contents: read

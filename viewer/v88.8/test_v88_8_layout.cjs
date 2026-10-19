@@ -164,6 +164,9 @@ const overlaps = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 &&
 
     // End-to-end manual-token path: trusted operator-side test code issues the
     // credential; the browser only receives the short-lived viewer token.
+    // The built-in static fixture server has no gateway API; reserve this part
+    // for runs that explicitly provide a gateway URL.
+    if (requestedUrl) {
     const gatewayOrigin=new URL(baseUrl).origin;
     const issuerKey=process.env.TELEMETRY_SESSION_ISSUER_KEY;
     const webhookSecret=process.env.GITHUB_WEBHOOK_SECRET;
@@ -199,6 +202,10 @@ const overlaps = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 &&
     assert.equal(await authPage.locator('#v71-state').getAttribute('data-state'),'connected',
       'manual token connection failed: '+await authPage.locator('#v71-detail').innerText());
     await authPage.locator('#v71-last-event').filter({hasText:'github.workflow.success'}).waitFor({timeout:10000});
+    assert.equal(await authPage.locator('#v71-connectors [data-connector="github"] strong').innerText(),'CONFIGURED',
+      'configured webhook does not display as a live connection');
+    assert.equal(await authPage.locator('#v71-connectors [data-connector="render"] strong').innerText(),'UNCONNECTED',
+      'unconfigured provider status is preserved');
     assert.equal(await authPage.locator('#v80-token').inputValue(),'','manual token field cleared');
     assert.equal(await authPage.evaluate(token=>localStorage.getItem('telemetryToken')===token||
       sessionStorage.getItem('telemetryToken')===token,issued.token),false,'token not persisted');
@@ -214,6 +221,7 @@ const overlaps = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 &&
     assert.equal(await authPage.locator('#v71-disconnect').isEnabled(),false,'manual Disconnect disables itself');
     await telemetrySocketClose;
     await authPage.close();
+    }
   } finally {await browser.close(); if(server)await new Promise(resolve=>server.close(resolve))}
   fs.writeFileSync(path.join(output,'layout-report.json'),JSON.stringify(report,null,2));
   for(const row of report) console.log(row.viewport+' PASS · 6 panels · '+row.timelinePoints+' chart points');
