@@ -14,7 +14,7 @@ async function freePort() {
   await new Promise(resolve=>s.close(resolve));
   return port;
 }
-async function withGateway(run) {
+async function withGateway(run,environment={}) {
   const port=await freePort();
   const secret="github-test-secret";
   const token="viewer-test-token";
@@ -22,7 +22,7 @@ async function withGateway(run) {
     cwd:process.cwd(),
     env:{...process.env,PORT:String(port),GITHUB_WEBHOOK_SECRET:secret,
       TELEMETRY_SESSION_ISSUER_KEY:"issuer-test-key",TELEMETRY_SESSION_SIGNING_KEY:"signing-test-key",CORS_ORIGIN:"https://viewer.example",
-      GATEWAY_TOKEN:"execution-token",OPENAI_API_KEY:"fake",NEURAL_GRID_MODE:"execution"},
+      GATEWAY_TOKEN:"execution-token",OPENAI_API_KEY:"fake",OPENAI_ADMIN_KEY:"",NEURAL_GRID_MODE:"execution",...environment},
     stdio:"ignore"
   });
   try {
@@ -77,6 +77,20 @@ test("execution disabled even when environment requests execution",async()=>{
     assert.equal(r.status,403);
     assert.equal((await r.json()).error,"execution_disabled");
   });
+});
+test("OpenAI usage endpoint requires a read-only viewer session and exposes no write route",async()=>{
+  await withGateway(async({url,issue})=>{
+    assert.equal((await fetch(url+"/api/openai/telemetry")).status,401);
+    const token=await issue();
+    const response=await fetch(url+"/api/openai/telemetry",{headers:{authorization:"Bearer "+token,origin:"https://viewer.example"}});
+    assert.equal(response.status,200);
+    const body=await response.json();
+    assert.equal(body.status,"unconnected");
+    assert.equal(body.verified,false);
+    assert.equal(JSON.stringify(body).includes("fake"),false,"no API credential is included in telemetry");
+    assert.equal((await fetch(url+"/api/openai/telemetry",{method:"POST",headers:{authorization:"Bearer "+token,origin:"https://viewer.example"}})).status,404);
+    assert.equal((await fetch(url+"/api/openai/task",{method:"POST",headers:{authorization:"Bearer "+token,origin:"https://viewer.example"}})).status,403);
+  },{OPENAI_API_KEY:"fake",OPENAI_ADMIN_KEY:""});
 });
 test("history endpoint rejects unauthenticated and invalid credentials",async()=>{
   await withGateway(async({url,issue})=>{

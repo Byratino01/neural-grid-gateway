@@ -5,7 +5,7 @@
 // tiny fallback so the monitor remains legible if its metadata script fails.
 const catalog = Array.isArray(window.__NG_CONNECTORS) ? window.__NG_CONNECTORS : [
   {id:'github',name:'GitHub'}, {id:'render',name:'Render'},
-  {id:'netlify',name:'Netlify'}, {id:'chatgpt',name:'ChatGPT'},
+  {id:'netlify',name:'Netlify'}, {id:'chatgpt',name:'OpenAI API'},
   {id:'truck-scanner',name:'Truck Scanner'}
 ];
 const $ = id => document.getElementById(id);
@@ -48,7 +48,7 @@ function setRow(id, value) {
   const entry = rows.get(id); if (!entry) return;
   entry.row.dataset.status = value; entry.indicator.textContent = value.toUpperCase();
 }
-function clearLive() { document.dispatchEvent(new Event('ng:monitor-reset')); known.clear(); for (const {id} of catalog) setRow(id,'unconnected'); }
+function clearLive() { document.dispatchEvent(new Event('ng:monitor-reset')); window.__NG_OPENAI_USAGE?.reset(); known.clear(); for (const {id} of catalog) setRow(id,'unconnected'); }
 function applyRegistry(payload) {
   if (!payload || !Array.isArray(payload.connectors)) throw Error('Invalid connector registry');
   const next = new Map();
@@ -63,6 +63,25 @@ function applyRegistry(payload) {
     // Preserve registry state exactly. A configured endpoint is not a live
     // connection, and errors/disconnections must remain visible to operators.
     setRow(id,c.status === 'connected' && c.connected !== true ? 'error' : c.status);
+  }
+}
+async function refreshOpenAI(base,token,ticket){
+  setRow('chatgpt','connecting');
+  try{
+    const response=await fetch(base+'/api/openai/telemetry',{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
+    if(ticket!==attempt)return;
+    if(!response.ok){
+      const state=response.status===404?'unconnected':'error';setRow('chatgpt',state);
+      window.__NG_OPENAI_USAGE?.reset();return;
+    }
+    const payload=await response.json();
+    if(ticket!==attempt)return;
+    if(payload?.schema!=='neural-grid/openai-usage/v1'||payload?.provider!=='openai_api')throw Error('Invalid OpenAI telemetry response');
+    const state=payload.status==='connected'&&payload.verified===true?'connected':payload.status==='error'?'error':'unconnected';
+    setRow('chatgpt',state);
+    window.__NG_OPENAI_USAGE?.ingest(payload);
+  }catch{
+    if(ticket===attempt){setRow('chatgpt','error');window.__NG_OPENAI_USAGE?.reset();}
   }
 }
 function pulse(id) {
@@ -127,6 +146,8 @@ async function connect() {
     if (!historyResponse.ok) throw Error('History HTTP '+historyResponse.status);
     const historyPayload=await historyResponse.json();
     if (Array.isArray(historyPayload.events)) for (const event of historyPayload.events) ingest(event);
+    if (ticket!==attempt) return;
+    await refreshOpenAI(base,token,ticket);
     if (ticket!==attempt) return;
     const ws=new WebSocket(base.replace(/^https:/,'wss:')+'/events',['neural-grid-telemetry-v1','ng-auth.'+token]);
     socket=ws;

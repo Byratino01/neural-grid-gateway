@@ -8,7 +8,7 @@ const path = require('node:path');
 const {chromium} = require('playwright');
 
 const requestedUrl = process.env.V88_6_URL;
-const output = path.join(__dirname, 'V88.8-screenshots');
+const output = process.env.V88_LAYOUT_OUTPUT || path.join(__dirname, 'V88.8-screenshots');
 const sizes = [[1714,864], [1920,1080], [1366,768], [1024,768], [768,1024]];
 const ids = ['connectors','activity','system','flow','metrics','map'];
 const chrome = process.env.PLAYWRIGHT_CHROME_PATH;

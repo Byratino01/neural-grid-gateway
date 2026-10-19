@@ -80,6 +80,7 @@ body{font-family:var(--v70-font)}
 .activity-item{display:grid;grid-template-columns:56px 7px 25px minmax(0,1fr);gap:5px;align-items:center;min-height:57px;padding:6px 1px;border-bottom:1px solid #1a4058;font-size:10px}
 .activity-item time{color:#89adc0;font-variant-numeric:tabular-nums}
 .activity-item b,.activity-item small,.activity-description{display:block;line-height:1.3}
+.openai-usage-snapshot{display:grid;gap:3px;padding:6px 1px;border-bottom:1px solid #1a4058;font-size:9px}.openai-usage-snapshot b{color:#e4f5fc;font-size:9px;font-weight:600}.openai-usage-snapshot small{color:#94bed0;line-height:1.3}
 .activity-item b{color:#e4f5fc;font-size:10px;font-weight:600}
 .activity-item small{color:#94bed0;margin-top:2px;font-size:9px}.activity-description{color:#c8e5f2;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .activity-icon{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#eaf7ff}.activity-icon .service-icon{width:17px;height:17px;filter:none}.activity-icon .icon-higgsfield{width:25px;height:25px}

@@ -5,6 +5,7 @@
   const events = new Map();
   const runs = new Map();
   const attempts = new Set();
+  let openaiUsage = null;
   const failures = new Set(['failure', 'cancelled', 'timed_out']);
   const terminal = new Set(['completed', 'success', ...failures, 'skipped', 'neutral', 'action_required', 'stale']);
   const $ = selector => document.querySelector(selector);
@@ -119,21 +120,46 @@
         safe(event.workflow) + '</span><small>' + safe(state).replaceAll('_',' ') + ' · run #' +
         safe(event.runId) + '</small></div></article>';
     }).join('') || '<div class="empty">No authenticated telemetry received</div>';
+    if(feed&&openaiUsage?.verified){
+      const snapshot=document.createElement('aside');snapshot.id='v88-openai-usage';snapshot.setAttribute('role','status');
+      snapshot.className='openai-usage-snapshot';
+      const title=document.createElement('b');title.textContent='OPENAI API · VERIFIED READ ONLY';snapshot.append(title);
+      const details=document.createElement('small');
+      const records=openaiUsage.usage.status==='available'?openaiUsage.usage.records:[];
+      if(records.length){
+        const sum=field=>{const values=records.map(row=>row[field]).filter(Number.isSafeInteger);return values.length?values.reduce((a,b)=>a+b,0):null;};
+        const models=[...new Set(records.map(row=>row.model).filter(Boolean))];
+        details.textContent='Provider-reported daily aggregate · '+(sum('requests')??'—')+' model requests · '+
+          (sum('inputTokens')??'—')+' input / '+(sum('outputTokens')??'—')+' output tokens'+
+          (models.length?' · '+models.slice(0,3).join(', '):'');
+      }else if(openaiUsage.usage.status==='available'){
+        details.textContent='API verified; no model usage rows returned for the current UTC-day bucket.';
+      }else if(openaiUsage.usage.status==='not_configured'){
+        details.textContent='API verified; organization Usage Read is not configured.';
+      }else{
+        details.textContent='API verified; provider usage unavailable ('+openaiUsage.usage.status+').';
+      }
+      snapshot.append(details);feed.append(snapshot);
+    }
     renderChart(chronology);
     const flow = $('#v70-flow .v70-data');
     if (flow) flow.innerHTML = '<div class="flow-summary"><span class="flow-legend"><i></i> GITHUB <b>' + events.size +
       '</b></span><span>Time → · cumulative events ↑</span></div>';
     const metrics = $('#v70-metrics .v70-data');
     if (metrics) metrics.innerHTML = '<div class="station-table"><div class="station-header"><span>STATION</span><span>CPU</span><span>MEM</span><span>EVENTS</span></div>' +
-      [['github','GITHUB',events.size,active.length?'active':'idle'],['render','RENDER',0,'muted'],['netlify','NETLIFY',0,'muted'],['chatgpt','CHATGPT',0,'muted'],['higgsfield','HIGGSFIELD',0,'muted']]
+      [['github','GITHUB',events.size,active.length?'active':'idle'],['render','RENDER',0,'muted'],['netlify','NETLIFY',0,'muted'],['chatgpt','OPENAI API',0,'muted'],['higgsfield','HIGGSFIELD',0,'muted']]
         .map(([id,name,count,state]) => '<div class="station-row ' + state + '"><span><i></i>' + serviceIcon(id,'service-icon') + name + '</span><span>—</span><span>—</span><strong>' + count + '</strong></div>').join('') +
       '</div><div class="station-history">GitHub ' + (active.length ? active.length+' active' : 'idle') +
-      ' · completed history ' + completed.length + ' · failed history ' + failed.length + '</div>';
+      ' · completed history ' + completed.length + ' · failed history ' + failed.length + '</div>'+
+      (openaiUsage?.verified?'<div class="station-history" title="Provider-reported daily aggregate; not a live event count">OpenAI API · '+
+        (openaiUsage.usage.status==='available'?'daily aggregate · '+openaiUsage.usage.records.length+' model rows':'usage unavailable')+
+        ' · no ChatGPT account telemetry</div>':'');
     const map = $('#v70-map .v70-data');
     if (map) map.innerHTML = '<div class="route-note"><b>' +
       (mode === 'live' ? '● VERIFIED SESSION' : mode === 'fixture' ? '◆ FIXTURE · NOT LIVE' : '○ CONFIGURED · OFFLINE') +
       '</b><span>GitHub webhook → staging gateway → read-only viewer</span><small>Viewer ' +
-      (mode === 'live' ? 'authenticated' : 'disconnected') + ' · execution disabled</small></div>';
+      (mode === 'live' ? 'authenticated' : 'disconnected') + ' · OpenAI '+
+      (openaiUsage?.verified?'verified · read only':'unverified')+'</small></div>';
     const graphic = $('#v70-map .connection-map');
     if (graphic) graphic.dataset.state = mode === 'live' && events.size ? 'verified' : mode;
     const station = $('#stations button[data-id="github"]');
@@ -144,13 +170,14 @@
   }
 
   document.addEventListener('ng:monitor-event', event => ingest(event.detail));
+  document.addEventListener('ng:openai-usage',event=>{openaiUsage=event.detail||null;render();});
   document.addEventListener('ng:monitor-reset', () => {
-    events.clear(); runs.clear(); attempts.clear(); render();
+    events.clear(); runs.clear(); attempts.clear(); openaiUsage=null; render();
   });
   const monitor = $('#v71-state');
   if (monitor) new MutationObserver(render).observe(monitor, {attributes: true, attributeFilter: ['data-state']});
   window.__ngV88LiveDashboard = {
-    snapshot: () => ({runs: [...runs.values()], events: [...events.values()], eventCount: events.size}),
+    snapshot: () => ({runs: [...runs.values()], events: [...events.values()], eventCount: events.size,openaiUsage}),
     ingest
   };
   render();

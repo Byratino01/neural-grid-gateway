@@ -5,6 +5,7 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {WebSocketServer} from "ws";
 import {listConnectors,routeConnectorEvent} from "./connector-registry.js";
+import {createOpenAIConnector} from "./openai-connector.js";
 
 // Execution is deliberately unavailable. Changing an environment variable cannot enable it.
 const mode = "monitor";
@@ -12,6 +13,8 @@ const port = Number(process.env.PORT || 10000);
 const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET || "";
 const sessionIssuerKey = process.env.TELEMETRY_SESSION_ISSUER_KEY || "";
 const sessionSigningKey = process.env.TELEMETRY_SESSION_SIGNING_KEY || "";
+// Optional read-only organization Usage credential stays on this trusted server.
+const openaiConnector=createOpenAIConnector({adminKey:process.env.OPENAI_ADMIN_KEY});
 // V88 staging policy: short-lived, read-only telemetry sessions.
 const sessionTtlSeconds = 900;
 const allowedOrigins = (process.env.CORS_ORIGIN || "").split(",").map(x => x.trim()).filter(Boolean);
@@ -181,6 +184,12 @@ const server = http.createServer(async (req,res) => {
       const issued=issueSession(input.origin);
       if (!issued) return json(res,403,{error:"origin_not_allowed"});
       return json(res,201,issued);
+    }
+    if (req.method === "GET" && req.url === "/api/openai/telemetry") {
+      if (origin && !allowedOrigins.includes(origin)) return json(res,403,{error:"origin_not_allowed"},origin);
+      if (!verifySession(req.headers.authorization?.replace(/^Bearer /,""),origin))
+        return json(res,401,{error:"unauthorized"},origin);
+      return json(res,200,await openaiConnector.snapshot(),origin);
     }
     if (req.method === "POST" && req.url === "/webhooks/github") {
       const raw = await readBody(req);

@@ -6,7 +6,7 @@
     {id:'github',name:'GitHub'},
     {id:'render',name:'Render'},
     {id:'netlify',name:'Netlify'},
-    {id:'chatgpt',name:'ChatGPT'},
+    {id:'chatgpt',name:'OpenAI API'},
     {id:'truck-scanner',name:'Truck Scanner'}
   ].map(entry => Object.freeze(entry)));
 })();
