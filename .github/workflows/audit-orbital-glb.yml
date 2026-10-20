@@ -1,0 +1,34 @@
+name: Audit Orbital Nexus GLB (read-only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v88-8-chatgpt-readonly
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect approved GLB hierarchy and PBR metadata
+        run: node scripts/audit-orbital-glb.mjs
+      - name: Validate viewer module dependencies
+        run: |
+          test -s viewer/v88.8/vendor/three/examples/jsm/postprocessing/EffectComposer.js
+          test -s viewer/v88.8/vendor/three/examples/jsm/postprocessing/RenderPass.js
+          test -s viewer/v88.8/vendor/three/examples/jsm/postprocessing/UnrealBloomPass.js
+          test -s viewer/v88.8/vendor/three/examples/jsm/postprocessing/OutputPass.js
+          node --check viewer/v88.8/cinematic-bloom.js
+          node --check viewer/v88.8/scene-audit.js
+          node --check viewer/v88.8/earth-motion.js
+          node --check viewer/v88.8/physical-look.js
+          node --check viewer/v88.8/reflection-environment.js
+      - name: Save audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbital-glb-audit
+          path: artifacts/orbital-glb-audit.json
+          retention-days: 7
