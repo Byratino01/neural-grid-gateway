@@ -12,7 +12,7 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const dest=resolve(root,'viewer/v88.8/vendor/three/examples/jsm');
 const version='0.169.0';
 const base='https://cdn.jsdelivr.net/npm/three@'+version+'/examples/jsm/';
-const queue=['postprocessing/EffectComposer.js','postprocessing/RenderPass.js','postprocessing/UnrealBloomPass.js'];
+const queue=['postprocessing/EffectComposer.js','postprocessing/RenderPass.js','postprocessing/UnrealBloomPass.js','postprocessing/OutputPass.js'];
 const seen=new Set();
 const saved=[];
 while(queue.length){
@@ -37,7 +37,7 @@ while(queue.length){
   saved.push(path);
   console.log('Installed',path);
 }
-for(const name of ['postprocessing/EffectComposer.js','postprocessing/RenderPass.js','postprocessing/UnrealBloomPass.js']){
+for(const name of ['postprocessing/EffectComposer.js','postprocessing/RenderPass.js','postprocessing/UnrealBloomPass.js','postprocessing/OutputPass.js']){
   if(!(await readFile(resolve(dest,name),'utf8')).length)throw new Error('Missing '+name);
 }
 console.log('Three.js '+version+' postprocessing modules installed ('+saved.length+' files).');
