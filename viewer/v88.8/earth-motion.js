@@ -17,7 +17,7 @@ export function createEarthMotion(THREE) {
       t.name.startsWith(target.name + '.') && /\.quaternion$|\.rotation$/.test(t.name)));
     if (hasRotationTrack) return {found:true,embeddedAnimation:true};
     earth = target;
-    return {found:true,embeddedAnimation:false};
+    return {found:true,embeddedAnimation:false,node:target.name};
   }
   function update(dt) {
     if (!earth) return;
