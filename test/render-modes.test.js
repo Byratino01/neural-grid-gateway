@@ -22,7 +22,7 @@ test('mode switching is reversible and does not recreate scene or camera',()=>{
 
 test('benchmark summary reports frame percentiles and separates renderer counters',()=>{
   const result=summarizeRenderSample('A',[10,20,30,40],{
-    scene:{calls:12,triangles:80},post:{calls:14,triangles:14},total:{calls:26,triangles:94},resources:{pixelRatio:1.25},gpuTimingSupported:true
+    scene:{calls:12,triangles:80},post:{calls:14,triangles:14},total:{calls:26,triangles:94},drawBreakdown:{model:8,viewer:3,shadow:1,transparentDoubleSide:2},resources:{pixelRatio:1.25},gpuTimingSupported:true
   },[1,2,3]);
   assert.equal(result.frames,4);
   assert.equal(result.averageFrameTimeMs,25);
@@ -31,6 +31,7 @@ test('benchmark summary reports frame percentiles and separates renderer counter
   assert.equal(result.onePercentLowFps,25);
   assert.deepEqual(result.scene,{calls:12,triangles:80});
   assert.deepEqual(result.post,{calls:14,triangles:14});
+  assert.deepEqual(result.drawBreakdown,{model:8,viewer:3,shadow:1,transparentDoubleSide:2});
   assert.equal(result.averageGpuFrameTimeMs,2);
   assert.equal(result.medianGpuFrameTimeMs,2);
   assert.equal(result.gpuSamples,3);

@@ -38,6 +38,7 @@ export function summarizeRenderSample(mode,frameTimes,metrics={},gpuFrameTimes=[
     gpuTimingSupported:Boolean(metrics.gpuTimingSupported),gpuSamples:gpuSamples.length,
     averageGpuFrameTimeMs:gpuMean,medianGpuFrameTimeMs:gpuMedian,p95GpuFrameTimeMs:percentile(gpuSamples,.95),
     scene:metrics.scene||null,post:metrics.post||null,total:metrics.total||null,
+    drawBreakdown:metrics.drawBreakdown||null,
     resources:metrics.resources||null
   };
 }

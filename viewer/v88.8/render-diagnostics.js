@@ -4,7 +4,7 @@ import {RENDER_MODES,summarizeRenderSample} from './render-modes.js';
 
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-export function createRenderDiagnostics(renderer,{intervalMs=1500,setMode=()=>{},getSceneDiagnostics=()=>null,warmupMs=3000,sampleMs=30000}={}) {
+export function createRenderDiagnostics(renderer,{intervalMs=1500,setMode=()=>{},setPixelRatio=()=>{},getSceneDiagnostics=()=>null,warmupMs=3000,sampleMs=30000}={}) {
   const enabled=new URLSearchParams(location.search).get('renderStats')==='1';
   if(!enabled)return {frame(){},dispose(){},setMode(){},getReport:()=>null};
   const panel=document.createElement('section');
@@ -26,9 +26,10 @@ export function createRenderDiagnostics(renderer,{intervalMs=1500,setMode=()=>{}
   Object.entries(RENDER_MODES).forEach(([id,mode])=>{const option=document.createElement('option');option.value=id;option.textContent=mode.label;modeSelect.append(option);});
   modeSelect.onchange=()=>setMode(modeSelect.value);
   const runButton=document.createElement('button');runButton.textContent='Benchmark all modes (30s each)';
+  const ratioButton=document.createElement('button');ratioButton.textContent='Compare pixel ratio 1.25 vs 1.0';
   const exportButton=document.createElement('button');exportButton.textContent='Export JSON';exportButton.disabled=true;
-  for(const button of [modeSelect,runButton,exportButton])Object.assign(button.style,{marginRight:'6px',padding:'4px 6px'});
-  modeRow.append(modeSelect,runButton,exportButton);
+  for(const button of [modeSelect,runButton,ratioButton,exportButton])Object.assign(button.style,{marginRight:'6px',padding:'4px 6px'});
+  modeRow.append(modeSelect,runButton,ratioButton,exportButton);
   const current=document.createElement('pre');current.style.whiteSpace='pre-wrap';
   const reportWrap=document.createElement('div');reportWrap.style.maxHeight='22vh';reportWrap.style.overflow='auto';
   const reportView=document.createElement('table');reportView.setAttribute('aria-label','Rendering mode benchmark comparison');
@@ -36,7 +37,7 @@ export function createRenderDiagnostics(renderer,{intervalMs=1500,setMode=()=>{}
   const status=document.createElement('div');status.setAttribute('role','status');
   reportWrap.append(reportView);panel.append(heading,modeRow,current,status,reportWrap);document.body.append(panel);
   let last=performance.now(),lastFrame=last,frames=0,frameMs=0,renderMs=0;
-  let activeRun=null,latestMetrics=null,report=[],lastGpuMs=null;
+  let activeRun=null,latestMetrics=null,report=[],ratioReport=[],lastGpuMs=null;
   function setSelectedMode(id){modeSelect.value=id;setMode(id);}
   function frame(metrics){
     const now=performance.now(),delta=Math.max(0,now-lastFrame);lastFrame=now;
@@ -53,6 +54,7 @@ export function createRenderDiagnostics(renderer,{intervalMs=1500,setMode=()=>{}
     const shadow=getSceneDiagnostics?.();
     current.textContent=`FPS ${((frames*1000)/elapsed).toFixed(1)} | Frame ${(frameMs/frames).toFixed(1)} ms | Render CPU ${(renderMs/frames).toFixed(1)} ms\n`+
       `Scene + shadows: ${scene.calls} draws | ${scene.triangles.toLocaleString()} triangles\n`+
+      (metrics?.drawBreakdown?`Draw submissions: model ${metrics.drawBreakdown.model} (transmission target ${metrics.drawBreakdown.transmission}, included) | viewer ${metrics.drawBreakdown.viewer} | shadow ${metrics.drawBreakdown.shadow} | transparent double-side ${metrics.drawBreakdown.transparentDoubleSide}\n`: '')+
       `Postprocess: ${post.calls} draws | ${post.triangles.toLocaleString()} triangles\n`+
       `Total: ${total.calls} draws | ${total.triangles.toLocaleString()} triangles\n`+
       `Renderer resources: ${resources.geometries} geometries / ${resources.textures} textures\n`+
@@ -62,7 +64,7 @@ export function createRenderDiagnostics(renderer,{intervalMs=1500,setMode=()=>{}
   }
   function renderReport(){
     reportView.replaceChildren();
-    const headers=['Mode','Avg / median / 1% low FPS','CPU frame avg / median / P95 ms','GPU avg / median / P95 ms','Scene/shadow draws','Post draws','Triangles scene / post','Resources geom / tex','Pixel ratio'];
+    const headers=['Mode','Avg / median / 1% low FPS','CPU frame avg / median / P95 ms','GPU avg / median / P95 ms','Scene/shadow draws','Post draws','Model (transmission subset) / viewer / shadow','Triangles scene / post','Resources geom / tex','Pixel ratio'];
     const head=document.createElement('thead'),headRow=document.createElement('tr');
     for(const label of headers){const cell=document.createElement('th');cell.textContent=label;cell.style.textAlign='left';cell.style.padding='2px 5px';headRow.append(cell);}
     head.append(headRow);reportView.append(head);
@@ -71,7 +73,7 @@ export function createRenderDiagnostics(renderer,{intervalMs=1500,setMode=()=>{}
       const values=[row.mode,`${row.averageFps.toFixed(1)} / ${row.medianFps.toFixed(1)} / ${row.onePercentLowFps.toFixed(1)}`,
         `${row.averageFrameTimeMs.toFixed(2)} / ${row.medianFrameTimeMs.toFixed(2)} / ${row.p95FrameTimeMs.toFixed(2)}`,
         row.gpuSamples?`${row.averageGpuFrameTimeMs.toFixed(2)} / ${row.medianGpuFrameTimeMs.toFixed(2)} / ${row.p95GpuFrameTimeMs.toFixed(2)}`:'n/a',
-        row.scene?.calls??'n/a',row.post?.calls??'n/a',`${row.scene?.triangles??'n/a'} / ${row.post?.triangles??'n/a'}`,
+        row.scene?.calls??'n/a',row.post?.calls??'n/a',row.drawBreakdown?`${row.drawBreakdown.model} (${row.drawBreakdown.transmission}) / ${row.drawBreakdown.viewer} / ${row.drawBreakdown.shadow}`:'n/a',`${row.scene?.triangles??'n/a'} / ${row.post?.triangles??'n/a'}`,
         `${row.resources?.geometries??'n/a'} / ${row.resources?.textures??'n/a'}`,row.resources?.pixelRatio?.toFixed?.(2)??'n/a'];
       const tr=document.createElement('tr');for(const value of values){const td=document.createElement('td');td.textContent=String(value);td.style.padding='2px 5px';tr.append(td);}body.append(tr);
     }
@@ -97,10 +99,30 @@ export function createRenderDiagnostics(renderer,{intervalMs=1500,setMode=()=>{}
     }catch(error){activeRun=null;status.textContent=`Benchmark stopped: ${error.message}`;}
     finally{setSelectedMode('A');modeSelect.disabled=false;runButton.disabled=false;}
   }
+  async function runPixelRatioComparison(){
+    if(activeRun)return;
+    const original=renderer.getPixelRatio();ratioReport=[];ratioButton.disabled=true;runButton.disabled=true;modeSelect.disabled=true;
+    try{
+      setSelectedMode('A');
+      for(const ratio of [1.25,1.0])for(let repeat=1;repeat<=2;repeat++){
+        setPixelRatio(ratio);
+        status.textContent=`Pixel ratio ${ratio.toFixed(2)} · run ${repeat}: warming up for ${(warmupMs/1000).toFixed(0)}s…`;
+        await wait(warmupMs);
+        activeRun={collecting:true,samples:[],gpuSamples:[]};const capture=activeRun;
+        status.textContent=`Pixel ratio ${ratio.toFixed(2)} · run ${repeat}: sampling for ${(sampleMs/1000).toFixed(0)}s…`;
+        await wait(sampleMs);capture.collecting=false;
+        ratioReport.push({...summarizeRenderSample(`A · ratio ${ratio.toFixed(2)} · run ${repeat}`,capture.samples,latestMetrics||{},capture.gpuSamples),repeat,pixelRatio:ratio});
+        activeRun=null;
+      }
+      report=[...ratioReport];renderReport();status.textContent='Pixel ratio comparison complete (two runs at each setting).';
+    }catch(error){activeRun=null;status.textContent=`Pixel ratio comparison stopped: ${error.message}`;}
+    finally{activeRun=null;setPixelRatio(original);setSelectedMode('A');modeSelect.disabled=false;runButton.disabled=false;ratioButton.disabled=false;}
+  }
+  ratioButton.onclick=runPixelRatioComparison;
   runButton.onclick=runBenchmark;
   exportButton.onclick=()=>{
     const payload={createdAt:new Date().toISOString(),sampleDurationMs:sampleMs,warmupDurationMs:warmupMs,
-      timingNote:'Frame and renderCpuMs values are CPU-side wall-clock measurements, not GPU execution time. GPU frame values come from asynchronous disjoint timer queries and are omitted when unsupported, disjoint, or unavailable.',renderer:{...rendererDetails,pixelRatio:renderer.getPixelRatio()},modes:report};
+      timingNote:'Frame and renderCpuMs values are CPU-side wall-clock measurements, not GPU execution time. GPU frame values come from asynchronous disjoint timer queries and are omitted when unsupported, disjoint, or unavailable.',renderer:{...rendererDetails,pixelRatio:renderer.getPixelRatio()},modes:report,pixelRatioComparison:ratioReport};
     const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
     const link=document.createElement('a');link.href=url;link.download='neural-grid-render-benchmark.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   };

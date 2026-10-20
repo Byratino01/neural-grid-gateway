@@ -1,0 +1,80 @@
+{
+  "capturedAtUtcDate": "2026-10-20",
+  "environment": {
+    "browser": "Chrome via Playwright local browser session",
+    "gpu": "NVIDIA GeForce RTX 3070 Laptop GPU (ANGLE / Direct3D 11, WebGL 2)",
+    "viewportCssPixels": "1078 x 650",
+    "mode": "A — Baseline",
+    "warmupSeconds": 3,
+    "sampleSeconds": 30,
+    "repeatsPerPixelRatio": 2,
+    "initialAndRestoredPixelRatio": 1.25
+  },
+  "runs": [
+    {
+      "pixelRatio": 1.25,
+      "repeat": 1,
+      "averageFps": 28.8,
+      "medianFps": 30.8,
+      "onePercentLowFps": 16.4,
+      "cpuFrameTimeMs": {"average": 34.77, "median": 32.50, "p95": 49.70},
+      "gpuFrameTimeMs": {"average": 27.65, "median": 26.86, "p95": 37.27}
+    },
+    {
+      "pixelRatio": 1.25,
+      "repeat": 2,
+      "averageFps": 29.0,
+      "medianFps": 31.1,
+      "onePercentLowFps": 16.4,
+      "cpuFrameTimeMs": {"average": 34.47, "median": 32.20, "p95": 51.00},
+      "gpuFrameTimeMs": {"average": 27.43, "median": 26.45, "p95": 37.07}
+    },
+    {
+      "pixelRatio": 1.0,
+      "repeat": 1,
+      "averageFps": 30.7,
+      "medianFps": 32.2,
+      "onePercentLowFps": 19.3,
+      "cpuFrameTimeMs": {"average": 32.61, "median": 31.10, "p95": 41.70},
+      "gpuFrameTimeMs": {"average": 25.80, "median": 25.56, "p95": 32.90}
+    },
+    {
+      "pixelRatio": 1.0,
+      "repeat": 2,
+      "averageFps": 30.2,
+      "medianFps": 32.3,
+      "onePercentLowFps": 17.3,
+      "cpuFrameTimeMs": {"average": 33.15, "median": 30.95, "p95": 46.20},
+      "gpuFrameTimeMs": {"average": 25.77, "median": 25.58, "p95": 32.13}
+    }
+  ],
+  "pairedMeans": {
+    "pixelRatio1_25": {"averageFps": 28.9, "gpuAverageMs": 27.54},
+    "pixelRatio1_0": {"averageFps": 30.45, "gpuAverageMs": 25.785},
+    "pixelRatio1_0RelativeChange": {"averageFpsPercent": 5.36, "gpuAverageMsPercent": -6.37}
+  },
+  "renderCounts": {
+    "sceneAndShadowDrawCalls": 6236,
+    "postprocessDrawCalls": 14,
+    "sceneTriangles": 917502,
+    "postprocessTriangles": 14,
+    "geometries": 3134,
+    "textures": 20,
+    "rtx3070PixelRatio1_25Profile": {
+      "modelDrawSubmissionsIncludingTransmission": 6076,
+      "viewerOverlayDrawSubmissions": 160,
+      "transmissionTargetDrawSubmissionsIncludedInModel": 2977,
+      "mainTargetDrawSubmissions": 3259,
+      "mainCameraDrawSubmissions": 6236,
+      "otherCameraDrawSubmissions": 0,
+      "transparentDoubleSideSubmissions": 358,
+      "shadowSubmissions": 0
+    }
+  },
+  "notes": [
+    "Pixel ratio was restored to 1.25 in the finally path; the canvas returned to the original drawing-buffer scale.",
+    "The transmission-target count is a separate runtime profile captured at the same baseline configuration; it is a subset of model draw submissions, not an additional category to sum twice.",
+    "The page produced repeated 404 responses for unsupported local API polling paths during the browser session. GPU timer queries are the clearest rendering comparison; CPU timing and FPS may include that background browser activity.",
+    "This is a diagnostic comparison only. The default pixel ratio remains unchanged."
+  ]
+}
