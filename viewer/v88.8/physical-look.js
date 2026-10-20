@@ -18,9 +18,18 @@ export function createPhysicalLook(THREE, scene, renderer) {
   const createdMaterials = new Set();
   let active = null;
   const originals = new Map();
+  const originalShadowFlags = new Map();
+  const priorShadowEnabled = renderer.shadowMap.enabled;
+  const priorShadowType = renderer.shadowMap.type;
+  const priorExposure = renderer.toneMappingExposure;
   function restore() {
     for (const [mesh, material] of originals) mesh.material = material;
     originals.clear();
+    for (const [mesh, flags] of originalShadowFlags) {
+      mesh.castShadow = flags.castShadow;
+      mesh.receiveShadow = flags.receiveShadow;
+    }
+    originalShadowFlags.clear();
     for (const material of createdMaterials) material.dispose();
     createdMaterials.clear();
     active = null;
@@ -53,14 +62,24 @@ export function createPhysicalLook(THREE, scene, renderer) {
         originals.set(object, object.material);
         object.material = next;
       }
-      object.castShadow = true;
-      object.receiveShadow = true;
+      // Keep transparent, emissive, cloud and effect surfaces out of the shadow pass.
+      const shadowEligible = enhanced.some(m => m && !m.transparent && m.opacity === 1 &&
+        !m.alphaTest && !m.isMeshBasicMaterial &&
+        !/earth|planet|cloud|atmosphere|halo|glow|emissive|energy|packet|light|glass/i.test(object.name + ' ' + m.name));
+      if (shadowEligible) {
+        originalShadowFlags.set(object, {castShadow:object.castShadow,receiveShadow:object.receiveShadow});
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
     });
   }
   function dispose() {
     restore();
     scene.remove(sun);
     sun.dispose();
+    renderer.shadowMap.enabled = priorShadowEnabled;
+    renderer.shadowMap.type = priorShadowType;
+    renderer.toneMappingExposure = priorExposure;
   }
   return { install, dispose };
 }
