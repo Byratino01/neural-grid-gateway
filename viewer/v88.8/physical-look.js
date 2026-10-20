@@ -23,6 +23,8 @@ export function createPhysicalLook(THREE, scene, renderer) {
   const structuralName = /hull|panel|shell|metal|frame|structure|ring|station|module|deck|walkway/i;
   const effectName = /earth|planet|cloud|atmosphere|halo|glow|emissive|energy|packet|light|glass|hologram/i;
   const createdMaterials = new Set();
+  // Reuse enhanced clones across meshes sharing one imported material.
+  const cloneCache = new Map();
   let active = null;
   const originals = new Map();
   const originalShadowFlags = new Map();
@@ -36,6 +38,7 @@ export function createPhysicalLook(THREE, scene, renderer) {
     originalShadowFlags.clear();
     for (const material of createdMaterials) material.dispose();
     createdMaterials.clear();
+    cloneCache.clear();
     active = null;
   }
   function install(root) {
@@ -50,6 +53,11 @@ export function createPhysicalLook(THREE, scene, renderer) {
             material.transparent || material.alphaTest > 0 ||
             /earth|planet|cloud|atmosphere|light|glow|emissive|blue|red|energy|glass/i.test(object.name+' '+material.name)) return material;
         if (!material.isMeshStandardMaterial && !material.isMeshPhysicalMaterial) return material;
+        const isStructure = structuralName.test(object.name+' '+material.name);
+        const cacheKey = isStructure ? 'structural' : 'other';
+        let copies = cloneCache.get(material);
+        if (!copies) { copies = new Map(); cloneCache.set(material, copies); }
+        if (copies.has(cacheKey)) return copies.get(cacheKey);
         const copy = material.clone();
         createdMaterials.add(copy);
         // Retain imported PBR maps and explicit metallic/roughness values.
@@ -59,6 +67,7 @@ export function createPhysicalLook(THREE, scene, renderer) {
           copy.metalness = Math.max(copy.metalness, 0.72);
           copy.roughness = Math.min(Math.max(copy.roughness, 0.24), 0.48);
         }
+        copies.set(cacheKey, copy);
         return copy;
       });
       const next = Array.isArray(object.material) ? enhanced : enhanced[0];
