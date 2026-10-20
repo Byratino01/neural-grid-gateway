@@ -14,7 +14,7 @@ export function createEarthMotion(THREE) {
     const target = matches[0];
     // Avoid double rotation when the GLB already animates the Earth.
     const hasRotationTrack = clips.some(c => c.tracks.some(t =>
-      t.name.startsWith(target.name + '.') && /\.quaternion$|\.rotation$/.test(t.name)));
+      (t.name.startsWith(target.name + '.') || t.name.startsWith(target.uuid + '.')) && /\.(quaternion|rotation)$/.test(t.name)));
     if (hasRotationTrack) return {found:true,embeddedAnimation:true};
     earth = target;
     return {found:true,embeddedAnimation:false,node:target.name};
