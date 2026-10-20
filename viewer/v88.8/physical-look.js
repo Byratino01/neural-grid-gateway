@@ -46,6 +46,13 @@ export function createPhysicalLook(THREE, scene, renderer) {
   let active = null;
   const originals = new Map();
   const originalShadowFlags = new Map();
+  const optionalAtmosphere = new Map();
+  let diagnosticMode = {shadows:true,atmosphere:true};
+  function setDiagnosticMode({shadows=true,atmosphere=true}={}) {
+    diagnosticMode={shadows:Boolean(shadows),atmosphere:Boolean(atmosphere)};
+    renderer.shadowMap.enabled=diagnosticMode.shadows;
+    for (const [object, visible] of optionalAtmosphere) object.visible=diagnosticMode.atmosphere ? visible : false;
+  }
   function restore() {
     for (const [mesh, material] of originals) mesh.material = material;
     originals.clear();
@@ -54,6 +61,8 @@ export function createPhysicalLook(THREE, scene, renderer) {
       mesh.receiveShadow = flags.receiveShadow;
     }
     originalShadowFlags.clear();
+    for (const [object, visible] of optionalAtmosphere) object.visible=visible;
+    optionalAtmosphere.clear();
     for (const material of createdMaterials) material.dispose();
     createdMaterials.clear();
     overrideCache.clear();
@@ -65,6 +74,10 @@ export function createPhysicalLook(THREE, scene, renderer) {
     restore();
     active = root;
     root.traverse(object => {
+      if (/cloud|atmosphere|halo/i.test(object.name||'')) {
+        if (!optionalAtmosphere.has(object)) optionalAtmosphere.set(object,object.visible);
+        if (!diagnosticMode.atmosphere) object.visible=false;
+      }
       if (!object.isMesh || !object.material) return;
       const original = Array.isArray(object.material) ? object.material : [object.material];
       const enhanced = original.map(material => {
@@ -158,5 +171,10 @@ export function createPhysicalLook(THREE, scene, renderer) {
     renderer.shadowMap.type = priorShadowType;
     renderer.toneMappingExposure = priorExposure;
   }
-  return { install, dispose };
+  function getShadowProfile() {
+    let meshes=0,casters=0,receivers=0;
+    active?.traverse(object=>{if(object.isMesh){meshes++;if(object.castShadow)casters++;if(object.receiveShadow)receivers++;}});
+    return {enabled:Boolean(renderer.shadowMap.enabled),lightCasts:Boolean(sun.castShadow),meshes,casters,receivers};
+  }
+  return { install, setDiagnosticMode, getShadowProfile, dispose };
 }
