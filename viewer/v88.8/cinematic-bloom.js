@@ -3,6 +3,7 @@
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Vector2 } from 'three';
 
 export function createCinematicBloom(renderer, scene, camera) {
@@ -18,6 +19,7 @@ export function createCinematicBloom(renderer, scene, camera) {
     const size = renderer.getDrawingBufferSize(new Vector2());
     bloom = new UnrealBloomPass(size,0.42,0.55,0.88);
     composer.addPass(bloom);
+    composer.addPass(new OutputPass());
     return {
       enabled:true,
       render(){composer.render();},
