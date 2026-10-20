@@ -18,6 +18,10 @@ export function createPhysicalLook(THREE, scene, renderer) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMappingExposure = 1.0;
+  // Thousands of GLB meshes can make universal shadow casting prohibitively expensive.
+  // Only explicit structural surfaces participate; imported shadow flags remain respected.
+  const structuralName = /hull|panel|shell|metal|frame|structure|ring|station|module|deck|walkway/i;
+  const effectName = /earth|planet|cloud|atmosphere|halo|glow|emissive|energy|packet|light|glass|hologram/i;
   const createdMaterials = new Set();
   let active = null;
   const originals = new Map();
@@ -65,10 +69,11 @@ export function createPhysicalLook(THREE, scene, renderer) {
       // Keep transparent, emissive, cloud and effect surfaces out of the shadow pass.
       const shadowEligible = enhanced.some(m => m && !m.transparent && m.opacity === 1 &&
         !m.alphaTest && !m.isMeshBasicMaterial &&
-        !/earth|planet|cloud|atmosphere|halo|glow|emissive|energy|packet|light|glass/i.test(object.name + ' ' + m.name));
-      if (shadowEligible) {
+        !effectName.test(object.name + ' ' + m.name));
+      // Preserve artist-authored flags. Add shadow receiving to named structural parts,
+      // but never force all 3,076 meshes to cast shadows on every frame.
+      if (shadowEligible && structuralName.test(object.name + ' ' + enhanced.map(m=>m?.name||'').join(' '))) {
         originalShadowFlags.set(object, {castShadow:object.castShadow,receiveShadow:object.receiveShadow});
-        object.castShadow = true;
         object.receiveShadow = true;
       }
     });
