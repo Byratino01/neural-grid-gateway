@@ -9,14 +9,25 @@ export function createPhysicalLook(THREE, scene, renderer) {
   sun.shadow.camera.top = 32; sun.shadow.camera.bottom = -32;
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
   sun.shadow.bias = -0.0002;
+  sun.shadow.normalBias = 0.025;
+  sun.shadow.radius = 2;
   scene.add(sun);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMappingExposure = 1.0;
   const createdMaterials = new Set();
   let active = null;
+  const originals = new Map();
+  function restore() {
+    for (const [mesh, material] of originals) mesh.material = material;
+    originals.clear();
+    for (const material of createdMaterials) material.dispose();
+    createdMaterials.clear();
+    active = null;
+  }
   function install(root) {
     // Keep GLB textures and named emissive/transparent materials intact.
+    restore();
     active = root;
     root.traverse(object => {
       if (!object.isMesh || !object.material) return;
@@ -37,15 +48,19 @@ export function createPhysicalLook(THREE, scene, renderer) {
         }
         return copy;
       });
-      object.material = Array.isArray(object.material) ? enhanced : enhanced[0];
+      const next = Array.isArray(object.material) ? enhanced : enhanced[0];
+      if (enhanced.some((m,i)=>m!==original[i])) {
+        originals.set(object, object.material);
+        object.material = next;
+      }
       object.castShadow = true;
       object.receiveShadow = true;
     });
   }
   function dispose() {
-    for (const material of createdMaterials) material.dispose();
-    createdMaterials.clear();
-    active = null;
+    restore();
+    scene.remove(sun);
+    sun.dispose();
   }
   return { install, dispose };
 }
