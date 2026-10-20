@@ -20,9 +20,10 @@ export function createReflectionEnvironment(THREE, scene, renderer) {
   const target = pmrem.fromScene(studio,0.06,0.1,30);
   const previous = scene.environment;
   scene.environment = target.texture;
+  const previousIntensity = scene.environmentIntensity;
   scene.environmentIntensity = 0.65;
   pmrem.dispose();
   for (const geometry of geometries) geometry.dispose();
   for (const material of materials) material.dispose();
-  return {dispose(){if(scene.environment===target.texture)scene.environment=previous;target.dispose();}};
+  return {dispose(){if(scene.environment===target.texture){scene.environment=previous;scene.environmentIntensity=previousIntensity;}target.dispose();}};
 }
