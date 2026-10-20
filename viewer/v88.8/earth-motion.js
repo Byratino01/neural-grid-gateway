@@ -8,14 +8,14 @@ export function createEarthMotion(THREE) {
     if (!root) return {found:false,reason:'No model'};
     const matches = [];
     root.traverse(o => {
-      if (/^(earth|earth_mesh|planet_earth|earth_globe)$/i.test(o.name.trim())) matches.push(o);
+      if (/^(earth|earth_mesh|planet_earth|earth_globe|EARTH_rotating_sphere)$/i.test(o.name.trim())) matches.push(o);
     });
     if (matches.length !== 1) return {found:false,reason:matches.length ? 'Ambiguous Earth nodes' : 'Earth node not explicitly named'};
     const target = matches[0];
     // Avoid double rotation when the GLB already animates the Earth.
     const hasRotationTrack = clips.some(c => c.tracks.some(t =>
       (t.name.startsWith(target.name + '.') || t.name.startsWith(target.uuid + '.')) && /\.(quaternion|rotation)$/.test(t.name)));
-    if (hasRotationTrack) return {found:true,embeddedAnimation:true};
+    if (hasRotationTrack || clips.some(c => c.name === 'EARTH_rotating_sphere')) return {found:true,embeddedAnimation:true,node:target.name};
     earth = target;
     return {found:true,embeddedAnimation:false,node:target.name};
   }
