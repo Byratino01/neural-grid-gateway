@@ -25,6 +25,7 @@ jobs:
           node --check viewer/v88.8/scene-audit.js
           node --check viewer/v88.8/earth-motion.js
           node --check viewer/v88.8/physical-look.js
+          node --check viewer/v88.8/render-diagnostics.js
           node --check viewer/v88.8/reflection-environment.js
       - name: Test PBR lifecycle and reversible shadow state
         run: node scripts/test-physical-look.mjs
