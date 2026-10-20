@@ -22,6 +22,23 @@ export function createPhysicalLook(THREE, scene, renderer) {
   // Only explicit structural surfaces participate; imported shadow flags remain respected.
   const structuralName = /hull|panel|shell|metal|frame|structure|ring|station|module|deck|walkway/i;
   const effectName = /earth|planet|cloud|atmosphere|halo|glow|emissive|energy|packet|light|glass|hologram/i;
+  // Deterministic, tileable fine-scale roughness variation (no external assets).
+  // A shared 64x64 map is applied only to UV-mapped, untextured structural metals.
+  const n=64, pixels=new Uint8Array(n*n*4);
+  for(let y=0;y<n;y++) for(let x=0;x<n;x++) {
+    const grain=Math.sin(x*0.71+y*0.13)*Math.sin(y*1.91+x*0.37);
+    const rough=Math.round(215+grain*24);
+    const i=(y*n+x)*4;
+    pixels[i]=rough;pixels[i+1]=rough;pixels[i+2]=rough;pixels[i+3]=255;
+  }
+  const microRoughness=new THREE.DataTexture(pixels,n,n,THREE.RGBAFormat);
+  microRoughness.wrapS=THREE.RepeatWrapping;
+  microRoughness.wrapT=THREE.RepeatWrapping;
+  microRoughness.repeat.set(3,3);
+  microRoughness.magFilter=THREE.LinearFilter;
+  microRoughness.minFilter=THREE.LinearMipmapLinearFilter;
+  microRoughness.generateMipmaps=true;
+  microRoughness.needsUpdate=true;
   const createdMaterials = new Set();
   // Reuse enhanced clones across meshes sharing one imported material.
   const cloneCache = new Map();
@@ -54,7 +71,8 @@ export function createPhysicalLook(THREE, scene, renderer) {
             /earth|planet|cloud|atmosphere|light|glow|emissive|blue|red|energy|glass/i.test(object.name+' '+material.name)) return material;
         if (!material.isMeshStandardMaterial && !material.isMeshPhysicalMaterial) return material;
         const isStructure = structuralName.test(object.name+' '+material.name);
-        const cacheKey = isStructure ? 'structural' : 'other';
+        const hasUV=Boolean(object.geometry?.getAttribute('uv'));
+        const cacheKey = isStructure ? (hasUV ? 'structural-uv' : 'structural-no-uv') : 'other';
         let copies = cloneCache.get(material);
         if (!copies) { copies = new Map(); cloneCache.set(material, copies); }
         if (copies.has(cacheKey)) return copies.get(cacheKey);
@@ -66,6 +84,7 @@ export function createPhysicalLook(THREE, scene, renderer) {
             /hull|panel|shell|metal|frame|structure|ring|station|module/i.test(object.name+' '+copy.name)) {
           copy.metalness = Math.max(copy.metalness, 0.72);
           copy.roughness = Math.min(Math.max(copy.roughness, 0.24), 0.48);
+          if(hasUV && isStructure) copy.roughnessMap=microRoughness;
         }
         copies.set(cacheKey, copy);
         return copy;
@@ -91,6 +110,7 @@ export function createPhysicalLook(THREE, scene, renderer) {
     restore();
     scene.remove(sun);
     sun.dispose();
+    microRoughness.dispose();
     renderer.shadowMap.enabled = priorShadowEnabled;
     renderer.shadowMap.type = priorShadowType;
     renderer.toneMappingExposure = priorExposure;
