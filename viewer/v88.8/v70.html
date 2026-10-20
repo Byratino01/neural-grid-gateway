@@ -262,6 +262,7 @@ import {createEarthMotion} from './earth-motion.js';
 import {createReflectionEnvironment} from './reflection-environment.js';
 import {createGlowHalos} from './glow-halos.js';
 import {createCinematicBloom} from './cinematic-bloom.js';
+import {auditOrbitalScene} from './scene-audit.js';
 const byId=id=>document.getElementById(id);
 const app=document.querySelector('#scene'),status=document.querySelector('#status');const scene=new THREE.Scene();scene.background=new THREE.Color(0x04101c);const camera=new THREE.PerspectiveCamera(49,innerWidth/innerHeight,.1,1000);camera.position.set(0,25,42);const target=new THREE.Vector3(0,-.5,0);camera.lookAt(target);
 const clock=new THREE.Clock();let mixer=null,animationRunning=true,animationCount=0;let renderer;try{renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'})}catch(e){status.textContent='WebGL unavailable: '+e.message;throw e}renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;app.appendChild(renderer.domElement);
@@ -1167,6 +1168,8 @@ async function installModel(gltf,serial,details){
   physicalLook.install(candidate);
   candidate.traverse(o=>{if(o.isMesh)o.frustumCulled=true;});
   mixer=nextMixer;animationCount=clips.length;
+  const sceneAudit=auditOrbitalScene(candidate,clips);
+  console.info('Orbital Nexus GLB read-only audit',sceneAudit);
   const earthStatus=earthMotion.install(candidate,clips);
   if(!earthStatus.found)console.info('Earth rotation inactive:',earthStatus.reason);
  }catch(err){
