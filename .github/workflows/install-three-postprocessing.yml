@@ -1,0 +1,43 @@
+name: Install Three.js postprocessing assets
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out existing development branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/v88-8-chatgpt-readonly
+          persist-credentials: true
+      - name: Verify branch
+        run: |
+          test "$(git branch --show-current)" = "feature/v88-8-chatgpt-readonly"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download version-locked official Three.js modules
+        run: node scripts/install-three-postprocessing.mjs
+      - name: Validate required modules
+        run: |
+          test -s viewer/v88.8/vendor/three/examples/jsm/postprocessing/EffectComposer.js
+          test -s viewer/v88.8/vendor/three/examples/jsm/postprocessing/RenderPass.js
+          test -s viewer/v88.8/vendor/three/examples/jsm/postprocessing/UnrealBloomPass.js
+          git diff --check
+      - name: Commit downloaded modules to development branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add viewer/v88.8/vendor/three/examples/jsm/
+          if git diff --cached --quiet; then
+            echo "Three.js postprocessing assets already installed."
+            exit 0
+          fi
+          git commit -m "Vendor official Three.js r169 postprocessing dependencies"
+          git push origin HEAD:feature/v88-8-chatgpt-readonly
