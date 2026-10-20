@@ -12,6 +12,9 @@ export function createPhysicalLook(THREE, scene, renderer) {
   sun.shadow.normalBias = 0.025;
   sun.shadow.radius = 2;
   scene.add(sun);
+  const priorShadowEnabled = renderer.shadowMap.enabled;
+  const priorShadowType = renderer.shadowMap.type;
+  const priorExposure = renderer.toneMappingExposure;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMappingExposure = 1.0;
@@ -19,9 +22,6 @@ export function createPhysicalLook(THREE, scene, renderer) {
   let active = null;
   const originals = new Map();
   const originalShadowFlags = new Map();
-  const priorShadowEnabled = renderer.shadowMap.enabled;
-  const priorShadowType = renderer.shadowMap.type;
-  const priorExposure = renderer.toneMappingExposure;
   function restore() {
     for (const [mesh, material] of originals) mesh.material = material;
     originals.clear();
