@@ -23,7 +23,7 @@ while ((Get-Date) -lt $end) {
   $result = & $exe "--query-gpu=$fields" '--format=csv,noheader,nounits' 2>&1
   if ($LASTEXITCODE -ne 0) { throw "nvidia-smi failed: $result" }
   foreach ($line in $result) {
-    $parts = @("$line" -split ',\\s*')
+    $parts = @("$line" -split ',\s*')
     if ($parts.Count -ne 8) { continue }
     $rows.Add([pscustomobject]@{
       LocalTime = (Get-Date).ToString('o')
