@@ -1,7 +1,7 @@
 // Non-destructive real-time material and lighting enhancement for the approved GLB.
 // Original mesh geometry, transforms, textures and camera controls remain unchanged.
 export function createPhysicalLook(THREE, scene, renderer) {
-  const sun = new THREE.DirectionalLight(0xfff1dc, 1.8);
+  const sun = new THREE.DirectionalLight(0xfff1dc, 0.8);
   sun.position.set(24, 38, 18);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -17,7 +17,7 @@ export function createPhysicalLook(THREE, scene, renderer) {
   const priorExposure = renderer.toneMappingExposure;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 0.82;
   // Thousands of GLB meshes can make universal shadow casting prohibitively expensive.
   // Only explicit structural surfaces participate; imported shadow flags remain respected.
   const structuralName = /hull|panel|shell|metal|frame|structure|ring|station|module|deck|walkway/i;
@@ -40,6 +40,7 @@ export function createPhysicalLook(THREE, scene, renderer) {
   microRoughness.generateMipmaps=true;
   microRoughness.needsUpdate=true;
   const createdMaterials = new Set();
+  const overrideCache = new Map();
   // Reuse enhanced clones across meshes sharing one imported material.
   const cloneCache = new Map();
   let active = null;
@@ -55,6 +56,7 @@ export function createPhysicalLook(THREE, scene, renderer) {
     originalShadowFlags.clear();
     for (const material of createdMaterials) material.dispose();
     createdMaterials.clear();
+    overrideCache.clear();
     cloneCache.clear();
     active = null;
   }
@@ -66,7 +68,48 @@ export function createPhysicalLook(THREE, scene, renderer) {
       if (!object.isMesh || !object.material) return;
       const original = Array.isArray(object.material) ? object.material : [object.material];
       const enhanced = original.map(material => {
-        if (!material || material.isShaderMaterial || material.isMeshBasicMaterial ||
+        if (!material) return material;
+        const overrideMaterial = (configure) => {
+          let copy = overrideCache.get(material);
+          if (copy) return copy;
+          copy = material.clone();
+          configure(copy);
+          createdMaterials.add(copy);
+          overrideCache.set(material, copy);
+          return copy;
+        };
+        // The approved Earth surface includes its own geographic base-color
+        // texture. Its neutral 0.4 emissive factor washes out texture shading;
+        // attenuate only a reversible clone and keep the embedded map intact.
+        if (/geographic_surface/i.test(material.name||'') && material.emissive) {
+          return overrideMaterial(copy => copy.emissive.multiplyScalar(0.15));
+        }
+        // The approved cloud shell has an opaque white-blue factor (alpha=1),
+        // which hides the geographic surface. Make only its cloned material a
+        // light transparent overlay; geometry and embedded texture stay intact.
+        if (/clouds_translucent/i.test(material.name||'')) {
+          return overrideMaterial(copy => {
+            copy.transparent = true;
+            copy.opacity = Math.min(copy.opacity ?? 1,0.18);
+            copy.depthWrite = false;
+            copy.needsUpdate = true;
+          });
+        }
+        if (/atmospheric_scatter/i.test(material.name||'')) {
+          return overrideMaterial(copy => {
+            copy.transparent = true;
+            copy.opacity = Math.min(copy.opacity ?? 1,0.1);
+            copy.depthWrite = false;
+            copy.needsUpdate = true;
+          });
+        }
+        // Very high authored emissive strengths turn architectural accents
+        // white and broaden the bloom. Cap cloned strengths while retaining
+        // their source hue and all animated transforms/pulses.
+        if (material.emissive && Number(material.emissiveIntensity) > 1.8) {
+          return overrideMaterial(copy => { copy.emissiveIntensity = 1.8; });
+        }
+        if (material.isShaderMaterial || material.isMeshBasicMaterial ||
             material.transparent || material.alphaTest > 0 ||
             /earth|planet|cloud|atmosphere|light|glow|emissive|blue|red|energy|glass/i.test(object.name+' '+material.name)) return material;
         if (!material.isMeshStandardMaterial && !material.isMeshPhysicalMaterial) return material;

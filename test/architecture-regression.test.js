@@ -11,7 +11,7 @@ test("orbital scene initialization anchors remain in the established viewer",()=
   assert.match(html,/import \{GLTFLoader\} from 'three\/addons\/loaders\/GLTFLoader\.js'/);
   assert.match(html,/new THREE\.PerspectiveCamera\(49,innerWidth\/innerHeight,\.1,1000\)/);
   assert.match(html,/camera\.position\.set\(0,25,42\)/);
-  assert.match(html,/new THREE\.HemisphereLight\(0xaedbff,0x152134,2\)/);
+  assert.match(html,/new THREE\.HemisphereLight\(0xaedbff,0x152134,1\.0\)/);
   assert.match(html,/controls\.dampingFactor=\.07/);
   assert.match(html,/fetch\('\.\/orbital-nexus\.glb'/);
   assert.match(html,/renderer\.setAnimationLoop\(frame\)/);
