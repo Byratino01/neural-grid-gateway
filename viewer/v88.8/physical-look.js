@@ -1,0 +1,51 @@
+// Non-destructive real-time material and lighting enhancement for the approved GLB.
+// Original mesh geometry, transforms, textures and camera controls remain unchanged.
+export function createPhysicalLook(THREE, scene, renderer) {
+  const sun = new THREE.DirectionalLight(0xfff1dc, 1.8);
+  sun.position.set(24, 38, 18);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -32; sun.shadow.camera.right = 32;
+  sun.shadow.camera.top = 32; sun.shadow.camera.bottom = -32;
+  sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
+  sun.shadow.bias = -0.0002;
+  scene.add(sun);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMappingExposure = 1.0;
+  const createdMaterials = new Set();
+  let active = null;
+  function install(root) {
+    // Keep GLB textures and named emissive/transparent materials intact.
+    active = root;
+    root.traverse(object => {
+      if (!object.isMesh || !object.material) return;
+      const original = Array.isArray(object.material) ? object.material : [object.material];
+      const enhanced = original.map(material => {
+        if (!material || material.isShaderMaterial || material.isMeshBasicMaterial ||
+            material.transparent || material.alphaTest > 0 ||
+            /earth|planet|cloud|atmosphere|light|glow|emissive|blue|red|energy|glass/i.test(object.name+' '+material.name)) return material;
+        if (!material.isMeshStandardMaterial && !material.isMeshPhysicalMaterial) return material;
+        const copy = material.clone();
+        createdMaterials.add(copy);
+        // Retain imported PBR maps and explicit metallic/roughness values.
+        // Conservative defaults apply only to visibly untextured station hulls.
+        if (!copy.metalnessMap && !copy.roughnessMap && !copy.map &&
+            /hull|panel|shell|metal|frame|structure|ring|station|module/i.test(object.name+' '+copy.name)) {
+          copy.metalness = Math.max(copy.metalness, 0.72);
+          copy.roughness = Math.min(Math.max(copy.roughness, 0.24), 0.48);
+        }
+        return copy;
+      });
+      object.material = Array.isArray(object.material) ? enhanced : enhanced[0];
+      object.castShadow = true;
+      object.receiveShadow = true;
+    });
+  }
+  function dispose() {
+    for (const material of createdMaterials) material.dispose();
+    createdMaterials.clear();
+    active = null;
+  }
+  return { install, dispose };
+}
