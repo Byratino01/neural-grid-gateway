@@ -40,8 +40,9 @@ test('Phase 4.5 candidate changes only approved glass material JSON and preserve
  assert.equal(candidate.json.nodes.length,3104);assert.equal(candidate.json.meshes.length,3076);assert.equal(candidate.json.animations.length,118);assert.equal(candidate.json.images.length,2);
 });
 
-test('viewer candidate selection is opt-in and the approved model remains the default',async()=>{
+test('viewer defaults to the candidate and rollback explicitly loads the approved model',async()=>{
  const html=await readFile(new URL('../viewer/v88.8/v70.html',import.meta.url),'utf8');
- assert.match(html,/assetChoice==='phase-4-5'\?'.\/candidates\/orbital-nexus-phase-4-5-candidate\.glb':'.\/orbital-nexus\.glb'/);
- assert.match(html,/assetChoice==='phase-4-5'\?'orbital-nexus-phase-4-5-candidate\.glb':'orbital-nexus\.glb'/);
+ assert.match(html,/const rollbackAsset=assetChoice==='rollback'\|\|assetChoice==='original'/);
+ assert.match(html,/const bundledAsset=rollbackAsset\?'.\/orbital-nexus\.glb':'.\/candidates\/orbital-nexus-phase-4-5-candidate\.glb'/);
+ assert.match(html,/const bundledFilename=rollbackAsset\?'orbital-nexus\.glb':'orbital-nexus-phase-4-5-candidate\.glb'/);
 });

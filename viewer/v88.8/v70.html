@@ -1273,11 +1273,12 @@ window.addEventListener('drop',e=>{
  importGLBFile(f);
 });
 window.addEventListener('blur',()=>{dragDepth=0;dropZone.dataset.visible='false'});
-// The approved GLB remains the default. Candidate review is an explicit URL choice;
-// removing asset=phase-4-5 switches back to the approved asset on reload.
+// The production candidate is the default. The approved GLB remains available
+// through an explicit rollback query; the Phase 4.5 selector stays compatible.
 const assetChoice=new URLSearchParams(location.search).get('asset');
-const bundledAsset=assetChoice==='phase-4-5'?'./candidates/orbital-nexus-phase-4-5-candidate.glb':'./orbital-nexus.glb';
-const bundledFilename=assetChoice==='phase-4-5'?'orbital-nexus-phase-4-5-candidate.glb':'orbital-nexus.glb';
+const rollbackAsset=assetChoice==='rollback'||assetChoice==='original';
+const bundledAsset=rollbackAsset?'./orbital-nexus.glb':'./candidates/orbital-nexus-phase-4-5-candidate.glb';
+const bundledFilename=rollbackAsset?'orbital-nexus.glb':'orbital-nexus-phase-4-5-candidate.glb';
 if(location.protocol!=='file:')fetch(bundledAsset,{method:'HEAD'}).then(async r=>{
  if(!r.ok||modelLoadSerial!==0)return;
  const response=await fetch(bundledAsset);if(!response.ok)throw new Error('Bundled GLB HTTP '+response.status);

@@ -50,3 +50,7 @@ No candidate FPS or frame-time benchmark is available. No 60 FPS claim is made. 
 The focused Phase 4.5 preservation and candidate-selection tests pass. The full `npm.cmd test` suite passes: 55 passed, 0 failed. The existing source assertion that expected the old literal asset fetch now checks the explicit candidate selector and approved default. The static serving test also verifies the separate candidate URL and checksum. No final candidate activation is authorized by this report.
 
 Before final adoption, complete a Blender export round trip or formally retain the JSON-only material candidate, load the candidate in the actual Three.js viewer, review the matched visual at default and orbit/zoom angles, capture draw/resource counters, and run a foreground Windows benchmark. Keep `orbital-nexus.glb` as the default until those reviews pass and the user approves adoption.
+
+## Follow-up
+
+The preparation report above records the state at the time it was created. Candidate adoption, live Three.js viewer checks, updated renderer counters, and staging deployment status are tracked in [phase-4-5-adoption-report.md](phase-4-5-adoption-report.md). The preparation report's pre-adoption gate and failed-local-viewer note are historical, not the latest status.
