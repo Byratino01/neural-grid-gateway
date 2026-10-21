@@ -51,6 +51,8 @@ The Blender export round trip, valid foreground Windows FPS benchmark, and Rende
 
 ### Deployment record
 
-- Validated local commit: pending
-- Staging deploy ID/status: pending
-- Staging viewer verification: pending
+- Validated local adoption commit: `58492743e979a8c5786c4e5b769f117bfbac0445`
+- Push result: blocked. The local Git credential helper failed to launch and GitHub rejected the push because this checkout had no promptable credentials.
+- Staging deploy ID/status: not started. No Render deployment was triggered because the service is configured for another branch (`feature/monitor-mode-gateway-v2`), and triggering that configuration could deploy the wrong revision.
+- Staging viewer verification: pending credentialed push of the active feature branch, followed by a manual deploy of the exact validated commit through Render's specific-commit flow.
+
