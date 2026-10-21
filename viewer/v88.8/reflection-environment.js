@@ -1,6 +1,6 @@
 // Procedural reflection environment: self-contained, no external HDR downloads.
 // Generates an environment cubemap for GLB PBR materials using PMREM.
-export function createReflectionEnvironment(THREE, scene, renderer) {
+export function createReflectionEnvironment(THREE, scene, renderer, {blurSigma=0.04,intensity=0.65}={}) {
   const studio = new THREE.Scene();
   studio.background = new THREE.Color(0x091321);
   const geometries = [];
@@ -17,11 +17,11 @@ export function createReflectionEnvironment(THREE, scene, renderer) {
   panel(0xffd8ad,2.3,[8,3,1],[5,9],-Math.PI/2);
   panel(0x86a4cd,0.65,[0,-6,4],[16,3]);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const target = pmrem.fromScene(studio,0.06,0.1,30);
+  const target = pmrem.fromScene(studio,blurSigma,0.1,30);
   const previous = scene.environment;
   scene.environment = target.texture;
   const previousIntensity = scene.environmentIntensity;
-  scene.environmentIntensity = 0.65;
+  scene.environmentIntensity = intensity;
   pmrem.dispose();
   for (const geometry of geometries) geometry.dispose();
   for (const material of materials) material.dispose();

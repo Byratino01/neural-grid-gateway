@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {CINEMATIC_BLOOM,readRenderCounters,snapshotRenderResources,subtractRenderCounters} from '../viewer/v88.8/render-metrics.js';
+import {benchmarkEnvironmentReady} from '../viewer/v88.8/render-diagnostics.js';
 
 test('render statistics snapshot all relevant scene counters',()=>{
   assert.deepEqual(readRenderCounters({render:{calls:3076,triangles:435096,points:4,lines:7}}),
@@ -30,4 +31,10 @@ test('bloom tuning keeps a higher threshold and lower intensity',()=>{
 test('resource snapshot reports renderer counts and actual pixel ratio',()=>{
   assert.deepEqual(snapshotRenderResources({memory:{geometries:3100,textures:18}},1.7),
     {geometries:3100,textures:18,pixelRatio:1.7});
+});
+
+test('render benchmarks require a visible foreground browser tab',()=>{
+  assert.equal(benchmarkEnvironmentReady({visibilityState:'visible',hasFocus:()=>true}),true);
+  assert.equal(benchmarkEnvironmentReady({visibilityState:'visible',hasFocus:()=>false}),false);
+  assert.equal(benchmarkEnvironmentReady({visibilityState:'hidden',hasFocus:()=>true}),false);
 });

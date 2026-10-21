@@ -15,6 +15,7 @@ export function createPhysicalLook(THREE, scene, renderer) {
   const priorShadowEnabled = renderer.shadowMap.enabled;
   const priorShadowType = renderer.shadowMap.type;
   const priorExposure = renderer.toneMappingExposure;
+  const priorEnvironmentIntensity = scene.environmentIntensity;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMappingExposure = 0.82;
@@ -47,6 +48,11 @@ export function createPhysicalLook(THREE, scene, renderer) {
   const originals = new Map();
   const originalShadowFlags = new Map();
   const optionalAtmosphere = new Map();
+  const phase4BaselineMaterials = new Map();
+  const phase4StructuralMaterials = new Set();
+  const glassOriginals = new Map();
+  const glassClones = new Set();
+  let phase4Experiment = 'baseline';
   let diagnosticMode = {shadows:true,atmosphere:true};
   function setDiagnosticMode({shadows=true,atmosphere=true}={}) {
     diagnosticMode={shadows:Boolean(shadows),atmosphere:Boolean(atmosphere)};
@@ -54,6 +60,7 @@ export function createPhysicalLook(THREE, scene, renderer) {
     for (const [object, visible] of optionalAtmosphere) object.visible=diagnosticMode.atmosphere ? visible : false;
   }
   function restore() {
+    restoreGlassExperiment();
     for (const [mesh, material] of originals) mesh.material = material;
     originals.clear();
     for (const [mesh, flags] of originalShadowFlags) {
@@ -67,7 +74,90 @@ export function createPhysicalLook(THREE, scene, renderer) {
     createdMaterials.clear();
     overrideCache.clear();
     cloneCache.clear();
+    phase4BaselineMaterials.clear();
+    phase4StructuralMaterials.clear();
     active = null;
+  }
+  function materialState(material) {
+    return {
+      metalness:material.metalness,roughness:material.roughness,opacity:material.opacity,
+      emissive:material.emissive?.clone?.(),
+    };
+  }
+  function restorePhase4MaterialState() {
+    for (const [material,state] of phase4BaselineMaterials) {
+      if (state.metalness !== undefined) material.metalness=state.metalness;
+      if (state.roughness !== undefined) material.roughness=state.roughness;
+      if (state.opacity !== undefined) material.opacity=state.opacity;
+      if (state.emissive && material.emissive?.copy) material.emissive.copy(state.emissive);
+      material.needsUpdate=true;
+    }
+    renderer.toneMappingExposure=0.82;
+    scene.environmentIntensity=priorEnvironmentIntensity;
+    sun.intensity=0.8;
+  }
+  function restoreGlassExperiment() {
+    for (const [mesh,material] of glassOriginals) mesh.material=material;
+    glassOriginals.clear();
+    for (const material of glassClones) {
+      createdMaterials.delete(material);
+      material.dispose();
+    }
+    glassClones.clear();
+  }
+  function setPhase4Experiment(id='baseline') {
+    if (!['baseline','earth-lighting-metal','standard-glass'].includes(id))
+      throw new RangeError(`Unknown Phase 4 experiment: ${id}`);
+    restoreGlassExperiment();
+    restorePhase4MaterialState();
+    phase4Experiment=id;
+    if (id==='baseline' || !active) return {id,transmissionMaterials:0};
+    for (const [material] of phase4BaselineMaterials) {
+      if (/geographic_surface/i.test(material.name||'') && material.emissive) {
+        material.emissive.multiplyScalar(2/3);
+      } else if (/clouds_translucent/i.test(material.name||'')) {
+        material.opacity=0.12;
+      } else if (/atmospheric_scatter/i.test(material.name||'')) {
+        material.opacity=0.16;
+      } else if (phase4StructuralMaterials.has(material) && material.isMeshStandardMaterial) {
+        material.metalness=Math.max(material.metalness||0,0.8);
+        material.roughness=Math.min(Math.max((material.roughness||0)+0.06,0.3),0.56);
+      }
+      material.needsUpdate=true;
+    }
+    renderer.toneMappingExposure=0.79;
+    scene.environmentIntensity=Math.max(0,Number(priorEnvironmentIntensity||0)*0.85);
+    sun.intensity=0.68;
+    let transmissionMaterials=0;
+    if (id==='standard-glass') {
+      const cache=new Map();
+      active.traverse(object=>{
+        if (!object.isMesh || !object.material) return;
+        const source=Array.isArray(object.material)?object.material:[object.material];
+        let changed=false;
+        const next=source.map(material=>{
+          if (!material || !(Number(material.transmission)>0)) return material;
+          let copy=cache.get(material);
+          if (!copy) {
+            copy=material.clone();
+            copy.transmission=0;
+            copy.transparent=true;
+            copy.opacity=Math.min(Number(material.opacity??1),0.36);
+            copy.depthWrite=false;
+            copy.roughness=Math.max(Number(material.roughness??0),0.24);
+            copy.needsUpdate=true;
+            cache.set(material,copy);glassClones.add(copy);createdMaterials.add(copy);
+            transmissionMaterials++;
+          }
+          changed=true;return copy;
+        });
+        if (changed) {
+          glassOriginals.set(object,object.material);
+          object.material=Array.isArray(object.material)?next:next[0];
+        }
+      });
+    }
+    return {id,transmissionMaterials};
   }
   function install(root) {
     // Keep GLB textures and named emissive/transparent materials intact.
@@ -142,6 +232,7 @@ export function createPhysicalLook(THREE, scene, renderer) {
           copy.roughness = Math.min(Math.max(copy.roughness, 0.24), 0.48);
           if(hasUV && isStructure) copy.roughnessMap=microRoughness;
         }
+        if (isStructure) phase4StructuralMaterials.add(copy);
         copies.set(cacheKey, copy);
         return copy;
       });
@@ -161,6 +252,9 @@ export function createPhysicalLook(THREE, scene, renderer) {
         object.receiveShadow = true;
       }
     });
+    phase4BaselineMaterials.clear();
+    for (const material of createdMaterials) phase4BaselineMaterials.set(material,materialState(material));
+    setPhase4Experiment(phase4Experiment);
   }
   function dispose() {
     restore();
@@ -170,11 +264,12 @@ export function createPhysicalLook(THREE, scene, renderer) {
     renderer.shadowMap.enabled = priorShadowEnabled;
     renderer.shadowMap.type = priorShadowType;
     renderer.toneMappingExposure = priorExposure;
+    scene.environmentIntensity = priorEnvironmentIntensity;
   }
   function getShadowProfile() {
     let meshes=0,casters=0,receivers=0;
     active?.traverse(object=>{if(object.isMesh){meshes++;if(object.castShadow)casters++;if(object.receiveShadow)receivers++;}});
     return {enabled:Boolean(renderer.shadowMap.enabled),lightCasts:Boolean(sun.castShadow),meshes,casters,receivers};
   }
-  return { install, setDiagnosticMode, getShadowProfile, dispose };
+  return { install, setDiagnosticMode, setPhase4Experiment, getPhase4Experiment:()=>phase4Experiment, getShadowProfile, dispose };
 }
