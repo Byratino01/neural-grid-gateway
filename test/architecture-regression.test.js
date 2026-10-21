@@ -13,7 +13,8 @@ test("orbital scene initialization anchors remain in the established viewer",()=
   assert.match(html,/camera\.position\.set\(0,25,42\)/);
   assert.match(html,/new THREE\.HemisphereLight\(0xaedbff,0x152134,1\.0\)/);
   assert.match(html,/controls\.dampingFactor=\.07/);
-  assert.match(html,/fetch\('\.\/orbital-nexus\.glb'/);
+  assert.match(html,/const bundledAsset=assetChoice==='phase-4-5'\?'.\/candidates\/orbital-nexus-phase-4-5-candidate\.glb':'.\/orbital-nexus\.glb'/);
+  assert.match(html,/fetch\(bundledAsset\)/);
   assert.match(html,/renderer\.setAnimationLoop\(frame\)/);
 });
 

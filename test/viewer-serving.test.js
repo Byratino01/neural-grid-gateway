@@ -41,6 +41,11 @@ test("viewer entry and approved local assets are served from the isolated viewer
     assert.equal(model.status,200,"viewer model GET request");
     assert.equal(createHash("sha256").update(Buffer.from(await model.arrayBuffer())).digest("hex"),
       "a64b5e8c90c42132cd3a12c9fa29d21d5803e64890443cfb8bf7ff1645961cf6","gateway serves the approved GLB bytes");
+    const candidate=await fetch(base+"/viewer/candidates/orbital-nexus-phase-4-5-candidate.glb");
+    assert.equal(candidate.status,200,"viewer serves the opt-in Phase 4.5 candidate");
+    assert.equal(candidate.headers.get("content-type"),"model/gltf-binary");
+    assert.equal(createHash("sha256").update(Buffer.from(await candidate.arrayBuffer())).digest("hex"),
+      "fbdf534f9f4f54746b4b0837eb67be8e202adc41ee39dac8eb1d2c17d02ba9ad","gateway serves the separate candidate GLB bytes");
   });
 });
 
