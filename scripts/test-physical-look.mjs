@@ -22,21 +22,28 @@ class Material {
  clone(){const copy=Object.assign(new Material(this.name),this);copy.emissive=this.emissive.clone();return copy;}
  dispose(){this.disposed=true;}
 }
-const THREE={DirectionalLight:Light,PCFSoftShadowMap:2,DataTexture:Texture,RGBAFormat:1,RepeatWrapping:2,LinearFilter:3,LinearMipmapLinearFilter:4};
+class Vector3 { constructor(x=0,z=0){this.x=x;this.z=z;} }
+const THREE={DirectionalLight:Light,Vector3,PCFSoftShadowMap:2,DataTexture:Texture,RGBAFormat:1,RepeatWrapping:2,LinearFilter:3,LinearMipmapLinearFilter:4};
 const scene={environmentIntensity:.65,add(){},remove(){}},renderer={shadowMap:{enabled:false,type:0},toneMappingExposure:.75};
 const shared=new Material();
-const mesh=(name,material=shared,uv=true)=>({isMesh:true,name,material,visible:true,castShadow:false,receiveShadow:false,geometry:{getAttribute(k){return k==='uv'&&uv?{}:undefined;}}});
+const mesh=(name,material=shared,uv=true,x=0,z=0)=>({isMesh:true,name,material,position:{x,z},getWorldPosition(target){target.x=x;target.z=z;return target;},visible:true,castShadow:false,receiveShadow:false,geometry:{getAttribute(k){return k==='uv'&&uv?{}:undefined;}}});
 const earthSurfaceMaterial=new Material('V10_Earth_geographic_surface');
 earthSurfaceMaterial.map={embedded:true};
 const cloudMaterial=new Material('V8_Earth_clouds_translucent');
 const atmosphereMaterial=new Material('V8_Earth_atmospheric_scatter');
 const glassMaterial=new Material('R13_glass_blue');glassMaterial.transmission=.78;glassMaterial.isMeshPhysicalMaterial=true;
+const opticalMaterial=new Material('V7_optical_cyan_glass');opticalMaterial.transmission=.32;opticalMaterial.isMeshPhysicalMaterial=true;
 const hotMaterial=new Material('V7_ice_white_energy');
 hotMaterial.emissiveIntensity=24;
 const a=mesh('station_hull_A'),b=mesh('station_hull_B'),c=mesh('EARTH_rotating_sphere'),d=mesh('station_hull_no_uv',shared,false);
 const earthSurface=mesh('EARTH_rotating_sphere',earthSurfaceMaterial),clouds=mesh('EARTH_high_cloud_layer',cloudMaterial),atmosphere=mesh('EARTH_atmospheric_blue_halo',atmosphereMaterial),hot=mesh('station_energy',hotMaterial);
 const glass=mesh('station_glass',glassMaterial);
-const nodes=[a,b,c,d,earthSurface,clouds,atmosphere,hot,glass],root={traverse(fn){nodes.forEach(fn);}};
+const ringGlass=mesh('R17_RENDER_outer_glass_panel_0',glassMaterial,true,4.37,0);
+const windowGlass=mesh('R17_Browser_upper_observation_glass_0',glassMaterial,true,10,0);
+const perimeterGlass=mesh('R13_Netlify_tower_window_0',glassMaterial,true,14.13,0);
+const opticalDome=mesh('R13_RENDER_translucent_command_dome',opticalMaterial);
+const nodes=[a,b,c,d,earthSurface,clouds,atmosphere,hot,glass,ringGlass,windowGlass,perimeterGlass,opticalDome],root={traverse(fn){nodes.forEach(fn);},updateMatrixWorld(){}};
+const ringGeometry=ringGlass.geometry;
 const effect=createPhysicalLook(THREE,scene,renderer);
 effect.install(root);
 assert.equal(a.material,b.material,'Shared UV structural material must be reused');
@@ -71,8 +78,32 @@ assert.notEqual(glass.material,glassMaterial,'Glass experiment substitutes only 
 assert.equal(glass.material.transmission,0,'Glass experiment disables transmission in its clone');
 assert.equal(glass.material.transparent,true,'Glass experiment uses standard alpha transparency');
 assert.equal(glassMaterial.transmission,.78,'Approved source glass material remains untouched');
+assert.equal(opticalDome.material.transmission,0,'Phase 4 transparent-glass mode disables transmission on all transmissive materials');
+effect.setPhase4Experiment('phase4c-selective-transmission');
+assert.equal(renderer.toneMappingExposure,.82,'Phase 4C glass experiments keep the independent lighting refinement off');
+assert.equal(ringGlass.material.transmission,0,'Selective mode does not mistake central hub glass for perimeter glass');
+assert.equal(windowGlass.material.transmission,0,'Selective mode converts non-ring glass to standard PBR transparency');
+assert.equal(perimeterGlass.material.transmission,.78,'Selective mode retains transmission on glass beyond the perimeter radius threshold');
+assert.equal(opticalDome.material.transmission,0,'Selective mode does not preserve the command dome transmission');
+assert.equal(glassMaterial.transmission,.78,'Selective mode leaves shared source material unchanged');
+effect.setPhase4Experiment('phase4c-optimized-glass');
+assert.equal(ringGlass.material.transmission,0,'Optimized mode eliminates outer-ring transmission');
+assert.equal(ringGlass.material.opacity,.48,'Optimized mode gives existing glass a legible transparent body');
+assert.equal(windowGlass.material.opacity,.48,'Optimized mode applies consistent non-transmissive glass');
+effect.setPhase4Experiment('phase4c-hybrid-outer-ring');
+assert.equal(ringGlass.material.transmission,0,'Hybrid mode remains non-transmissive');
+assert.equal(ringGlass.material.opacity,.48,'Hybrid mode keeps the ring accent transparent enough for the blue perimeter underneath');
+assert.equal(perimeterGlass.material.emissive.value,glassMaterial.emissive.value*3.5,'Hybrid mode accents glass at the outer radius using its existing geometry');
+assert.equal(windowGlass.material.opacity,.48,'Hybrid mode leaves other windows at optimized-glass settings');
+effect.setPhase4Experiment('standard-glass');
+assert.equal(ringGlass.material.opacity,.36,'Existing Phase 4 transparent-glass preset remains unchanged');
 effect.setPhase4Experiment('baseline');
 assert.equal(glass.material,glassMaterial,'Baseline restores the original glass material reference');
+assert.equal(ringGlass.material,glassMaterial,'Baseline restores the shared original ring material');
+assert.equal(windowGlass.material,glassMaterial,'Baseline restores the shared original window material');
+assert.equal(perimeterGlass.material,glassMaterial,'Baseline restores the original perimeter-glass material');
+assert.equal(opticalDome.material,opticalMaterial,'Baseline restores the optical dome material');
+assert.equal(ringGlass.geometry,ringGeometry,'Glass switching preserves approved mesh geometry');
 assert.equal(earthSurface.material.emissive.value,earthEmissiveBaseline,'Baseline restores Earth material factors');
 assert.equal(clouds.material.opacity,.18,'Baseline restores cloud opacity');
 assert.equal(atmosphere.material.opacity,.1,'Baseline restores atmosphere opacity');

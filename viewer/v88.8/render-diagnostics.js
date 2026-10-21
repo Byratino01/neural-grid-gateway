@@ -28,7 +28,10 @@ export function createRenderDiagnostics(renderer,{intervalMs=1500,setMode=()=>{}
       renderer:String(gl.getParameter(debug?.UNMASKED_RENDERER_WEBGL||gl.RENDERER)||'unknown')};
   }catch{}
   Object.entries(RENDER_MODES).forEach(([id,mode])=>{const option=document.createElement('option');option.value=id;option.textContent=mode.label;modeSelect.append(option);});
-  for(const [id,label] of [['baseline','Phase 4: baseline'],['earth-lighting-metal','Phase 4: Earth / lighting / metal'],['standard-glass','Phase 4: standard transparent glass']]){
+  for(const [id,label] of [['baseline','Phase 4: baseline'],['earth-lighting-metal','Phase 4: Earth / lighting / metal'],['standard-glass','Phase 4: standard transparent glass'],
+    ['phase4c-selective-transmission','Phase 4C: selective perimeter-glass transmission'],
+    ['phase4c-optimized-glass','Phase 4C: optimized non-transmissive glass'],
+    ['phase4c-hybrid-outer-ring','Phase 4C: non-transmissive + perimeter accent']]){
     const option=document.createElement('option');option.value=id;option.textContent=label;phase4Select.append(option);
   }
   modeSelect.onchange=()=>setMode(modeSelect.value);
@@ -36,7 +39,7 @@ export function createRenderDiagnostics(renderer,{intervalMs=1500,setMode=()=>{}
   const runButton=document.createElement('button');runButton.textContent='Benchmark all modes (30s each)';
   const ratioButton=document.createElement('button');ratioButton.textContent='Compare pixel ratio 1.25 vs 1.0';
   const exportButton=document.createElement('button');exportButton.textContent='Export JSON';exportButton.disabled=true;
-  const phase4Button=document.createElement('button');phase4Button.textContent='Benchmark Phase 4 (30s each)';
+  const phase4Button=document.createElement('button');phase4Button.textContent='Benchmark Phase 4 / 4C modes (30s each)';
   for(const button of [modeSelect,phase4Select,runButton,ratioButton,phase4Button,exportButton])Object.assign(button.style,{marginRight:'6px',padding:'4px 6px'});
   phase4Select.title='Runtime-only experiments; choosing baseline restores the approved runtime appearance.';
   modeRow.append(modeSelect,phase4Select,runButton,ratioButton,phase4Button,exportButton);
@@ -137,7 +140,10 @@ export function createRenderDiagnostics(renderer,{intervalMs=1500,setMode=()=>{}
     report=[];renderReport();phase4Button.disabled=true;runButton.disabled=true;ratioButton.disabled=true;modeSelect.disabled=true;phase4Select.disabled=true;
     try{
       setSelectedMode('A');
-      for(const [id,label] of [['baseline','Phase 4 baseline'],['earth-lighting-metal','Phase 4 Earth / lighting / metal'],['standard-glass','Phase 4 standard transparent glass']]){
+      for(const [id,label] of [['baseline','Phase 4 baseline'],['earth-lighting-metal','Phase 4 Earth / lighting / metal'],['standard-glass','Phase 4 standard transparent glass'],
+        ['phase4c-selective-transmission','Phase 4C selective perimeter-glass transmission'],
+        ['phase4c-optimized-glass','Phase 4C optimized non-transmissive glass'],
+        ['phase4c-hybrid-outer-ring','Phase 4C non-transmissive + perimeter accent']]){
         phase4Select.value=id;
         setPhase4Experiment(id);status.textContent=`${label}: warming up for ${(warmupMs/1000).toFixed(0)}s…`;
         await wait(warmupMs);

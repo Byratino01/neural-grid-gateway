@@ -53,6 +53,12 @@ export function createPhysicalLook(THREE, scene, renderer) {
   const glassOriginals = new Map();
   const glassClones = new Set();
   let phase4Experiment = 'baseline';
+  const phase4cModes = new Set(['phase4c-selective-transmission','phase4c-optimized-glass','phase4c-hybrid-outer-ring']);
+  const phase4cLabels = Object.freeze({
+    'phase4c-selective-transmission':'Selective transmission (perimeter glass)',
+    'phase4c-optimized-glass':'Optimized non-transmissive glass',
+    'phase4c-hybrid-outer-ring':'Non-transmissive glass + perimeter accent'
+  });
   let diagnosticMode = {shadows:true,atmosphere:true};
   function setDiagnosticMode({shadows=true,atmosphere=true}={}) {
     diagnosticMode={shadows:Boolean(shadows),atmosphere:Boolean(atmosphere)};
@@ -105,14 +111,42 @@ export function createPhysicalLook(THREE, scene, renderer) {
     }
     glassClones.clear();
   }
+  function nonTransmissiveGlass(material,variant) {
+    const copy=material.clone();
+    copy.transmission=0;
+    copy.transparent=true;
+    copy.depthWrite=false;
+    copy.roughness=Math.max(Number(material.roughness??0),variant==='ring'?0.2:0.24);
+    if(variant==='optimized') {
+      // Preserve the authored cyan tint and transparency while giving the glass
+      // enough body to remain legible without the transmission scene capture.
+      copy.opacity=Math.min(0.48,Math.max(Number(material.opacity??1),0.38));
+      if(Number.isFinite(copy.metalness))copy.metalness=Math.max(copy.metalness,0.12);
+      copy.emissive?.multiplyScalar?.(1.35);
+    } else if(variant==='ring') {
+      // Accent the existing glass furthest from the center, preserving its
+      // authored cyan palette without adding geometry or changing transforms.
+      // Keep the accent panel as transparent as the optimized panes so the
+      // separately rendered blue perimeter paths remain visible through it.
+      copy.opacity=Math.min(0.48,Math.max(Number(material.opacity??1),0.38));
+      if(Number.isFinite(copy.metalness))copy.metalness=Math.max(copy.metalness,0.16);
+      copy.emissive?.multiplyScalar?.(3.5);
+    } else {
+      copy.opacity=Math.min(Number(material.opacity??1),0.36);
+    }
+    copy.needsUpdate=true;
+    glassClones.add(copy);createdMaterials.add(copy);
+    return copy;
+  }
   function setPhase4Experiment(id='baseline') {
-    if (!['baseline','earth-lighting-metal','standard-glass'].includes(id))
+    if (!['baseline','earth-lighting-metal','standard-glass',...phase4cModes].includes(id))
       throw new RangeError(`Unknown Phase 4 experiment: ${id}`);
     restoreGlassExperiment();
     restorePhase4MaterialState();
     phase4Experiment=id;
     if (id==='baseline' || !active) return {id,transmissionMaterials:0};
-    for (const [material] of phase4BaselineMaterials) {
+    const applyLighting=id==='earth-lighting-metal'||id==='standard-glass';
+    if(applyLighting)for (const [material] of phase4BaselineMaterials) {
       if (/geographic_surface/i.test(material.name||'') && material.emissive) {
         material.emissive.multiplyScalar(2/3);
       } else if (/clouds_translucent/i.test(material.name||'')) {
@@ -125,29 +159,33 @@ export function createPhysicalLook(THREE, scene, renderer) {
       }
       material.needsUpdate=true;
     }
-    renderer.toneMappingExposure=0.79;
-    scene.environmentIntensity=Math.max(0,Number(priorEnvironmentIntensity||0)*0.85);
-    sun.intensity=0.68;
+    if(applyLighting){
+      renderer.toneMappingExposure=0.79;
+      scene.environmentIntensity=Math.max(0,Number(priorEnvironmentIntensity||0)*0.85);
+      sun.intensity=0.68;
+    }
     let transmissionMaterials=0;
-    if (id==='standard-glass') {
+    if (id==='standard-glass'||phase4cModes.has(id)) {
       const cache=new Map();
+      active.updateMatrixWorld?.(true);
       active.traverse(object=>{
         if (!object.isMesh || !object.material) return;
         const source=Array.isArray(object.material)?object.material:[object.material];
         let changed=false;
         const next=source.map(material=>{
           if (!material || !(Number(material.transmission)>0)) return material;
-          let copy=cache.get(material);
-          if (!copy) {
-            copy=material.clone();
-            copy.transmission=0;
-            copy.transparent=true;
-            copy.opacity=Math.min(Number(material.opacity??1),0.36);
-            copy.depthWrite=false;
-            copy.roughness=Math.max(Number(material.roughness??0),0.24);
-            copy.needsUpdate=true;
-            cache.set(material,copy);glassClones.add(copy);createdMaterials.add(copy);
-            transmissionMaterials++;
+          const worldPosition=object.getWorldPosition?.(new THREE.Vector3())||object.position;
+          const perimeterGlass=Number.isFinite(worldPosition?.x)&&Number.isFinite(worldPosition?.z)&&
+            Math.hypot(worldPosition.x,worldPosition.z)>=13;
+          const keepTransmission=id==='phase4c-selective-transmission'&&perimeterGlass;
+          const variant=id==='standard-glass'?'standard':id==='phase4c-hybrid-outer-ring'&&perimeterGlass?'ring':'optimized';
+          const key=`${material.uuid||material.name||'glass'}:${keepTransmission?'transmission':variant}`;
+          let copy=cache.get(key);
+          if(!copy) {
+            copy=keepTransmission?material.clone():nonTransmissiveGlass(material,variant);
+            if(keepTransmission){glassClones.add(copy);createdMaterials.add(copy);}
+            cache.set(key,copy);
+            if(keepTransmission)transmissionMaterials++;
           }
           changed=true;return copy;
         });
@@ -157,7 +195,7 @@ export function createPhysicalLook(THREE, scene, renderer) {
         }
       });
     }
-    return {id,transmissionMaterials};
+    return {id,transmissionMaterials,label:phase4cLabels[id]||id};
   }
   function install(root) {
     // Keep GLB textures and named emissive/transparent materials intact.
