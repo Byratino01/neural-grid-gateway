@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#06111f"><title>Orbital Nexus V7 · Mission Control V50.1</title><style>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#06111f"><title>Orbital Nexus V7 · Mission Control V50.1</title><script>window.ORBITAL_FIXTURE_MODE=new URLSearchParams(location.search).get('fixture')==='1';</script><style>
 :root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#06111f;color:#e5f6ff}*{box-sizing:border-box}body{margin:0;overflow:hidden}#scene{position:fixed;inset:0;background:radial-gradient(circle at 50% 70%,#0b3554,#030812 72%)}#scene canvas{display:block}header{position:fixed;left:0;right:0;top:0;z-index:3;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(#04121fe8,#04121f00)}h1{font-size:16px;margin:0;letter-spacing:.13em}small{color:#79c9ec}.controls{display:flex;gap:7px;flex-wrap:wrap}button,.file{border:1px solid #3389a5aa;background:#0c2638df;color:#d9f7ff;border-radius:9px;padding:10px 12px;font:inherit;font-size:12px;cursor:pointer;backdrop-filter:blur(12px)}button.active{background:#145b7e;border-color:#6cdbff}button:focus-visible,.file:focus-within{outline:2px solid cyan}.file input{display:none}aside{position:fixed;right:12px;top:100px;width:min(290px,calc(100vw - 24px));z-index:3;background:#061827df;border:1px solid #3d8ca47a;border-radius:14px;padding:14px;backdrop-filter:blur(18px)}aside h2{font-size:15px;margin:0 0 8px}aside p{font-size:12px;line-height:1.6;color:#b5d5e5}.meta{font-size:11px;color:#79c9ec;margin:8px 0}.agent-note{padding:9px;background:#102d3e;border-radius:8px;margin-top:10px;font-size:12px;line-height:1.45}.station-active{border-color:#80ecff!important;background:#165574!important}#stations{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}#stations button{text-align:left}#status{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom));left:14px;right:14px;z-index:3;pointer-events:none;font-size:11px;color:#92cde6}#picker{display:none}@media(max-width:650px){header{align-items:flex-start;flex-direction:column}aside{top:auto;bottom:58px;left:12px;right:12px;width:auto;padding:10px}aside p{margin:5px 0}#stations{grid-template-columns:repeat(3,1fr)}button,.file{padding:8px}h1{font-size:14px}}
 #workspace{margin-top:10px;border-top:1px solid #3d8ca47a;padding-top:10px;max-height:38vh;overflow:auto}#workspace h3{font-size:12px;letter-spacing:.09em;margin:8px 0}#workspace input,#workspace select{width:100%;margin:3px 0 7px;background:#071b2b;color:#def;border:1px solid #347b98;border-radius:7px;padding:8px;font:inherit;font-size:12px}#workspace .actionrow{display:flex;gap:5px;flex-wrap:wrap}#workspace .actionrow button{flex:1;padding:7px 5px}#workspace .record{font-size:11px;padding:6px 0;border-bottom:1px solid #1a3a4b;overflow-wrap:anywhere}#workspace .muted{color:#8cb9cf;font-size:11px}#workspace .pill{display:inline-block;border:1px solid #377d9c;border-radius:20px;padding:2px 6px;font-size:10px}#workspace .bar{height:5px;background:#17354b;border-radius:5px;overflow:hidden;margin:7px 0}#workspace .bar span{display:block;height:100%;background:#5edaff;transition:width .3s}#workspace summary{cursor:pointer;font-size:12px;padding:5px 0}#workspace details{border-top:1px solid #234355;margin-top:7px}#workspace .notice{font-size:11px;color:#b8deef;line-height:1.45} @media(max-width:650px){#workspace{max-height:24vh}}
 
@@ -1337,7 +1337,7 @@ diagnostic.ready();
  el('v51-clear').onclick=()=>{draft=[];renderDraft();message('Draft cleared')};
  el('v51-submit').onclick=async()=>{try{if(!draft.length)throw Error('Add a step first');let j=await req('/api/v51/jobs','POST',{name:el('v51-name').value,steps:draft});message('Awaiting admin approval: '+j.id.slice(0,8));draft=[];renderDraft();refresh()}catch(e){message(e.message)}};
  el('v51-jobs').onclick=async e=>{const b=e.target.closest('button[data-id]');if(!b)return;try{await (b.dataset.action==='approve'?adminReq('/api/v53/jobs/'+encodeURIComponent(b.dataset.id)+'/approve'):req('/api/v51/jobs/'+encodeURIComponent(b.dataset.id)+'/'+b.dataset.action,'POST',{}));refresh()}catch(err){message(err.message)}};
- async function refresh(){if(panel.dataset.open!=='true')return;try{const [health,data]=await Promise.all([req('/api/v51/health'),req('/api/v51/jobs')]);el('v51-health').textContent='● Local engine ready · durable SQLite · '+health.providers;el('v51-jobs').innerHTML=data.jobs.map(j=>`<div class="v51-job"><strong>${safe(j.name)}</strong> <span class="v51-state">${safe(j.state)}</span><div>${j.cursor}/${j.steps.length} simulated steps · ${safe(j.id.slice(0,8))}</div>${j.state==='awaiting_approval'?`<button data-id="${j.id}" data-action="approve">Approve simulation</button>`:''}${j.state==='running'||j.state==='queued'?`<button data-id="${j.id}" data-action="pause">Pause</button>`:''}${j.state==='paused'?`<button data-id="${j.id}" data-action="resume">Resume</button>`:''}${['running','queued','paused','awaiting_approval'].includes(j.state)?`<button data-id="${j.id}" data-action="cancel">Cancel</button>`:''}</div>`).join('')||'No jobs yet'}catch(e){el('v51-health').textContent='Engine unavailable. Start with START_VIEWER.cmd (not python -m http.server).';message(e.message)}}
+ async function refresh(){if(window.ORBITAL_FIXTURE_MODE||panel.dataset.open!=='true')return;try{const [health,data]=await Promise.all([req('/api/v51/health'),req('/api/v51/jobs')]);el('v51-health').textContent='● Local engine ready · durable SQLite · '+health.providers;el('v51-jobs').innerHTML=data.jobs.map(j=>`<div class="v51-job"><strong>${safe(j.name)}</strong> <span class="v51-state">${safe(j.state)}</span><div>${j.cursor}/${j.steps.length} simulated steps · ${safe(j.id.slice(0,8))}</div>${j.state==='awaiting_approval'?`<button data-id="${j.id}" data-action="approve">Approve simulation</button>`:''}${j.state==='running'||j.state==='queued'?`<button data-id="${j.id}" data-action="pause">Pause</button>`:''}${j.state==='paused'?`<button data-id="${j.id}" data-action="resume">Resume</button>`:''}${['running','queued','paused','awaiting_approval'].includes(j.state)?`<button data-id="${j.id}" data-action="cancel">Cancel</button>`:''}</div>`).join('')||'No jobs yet'}catch(e){el('v51-health').textContent='Engine unavailable. Start with START_VIEWER.cmd (not python -m http.server).';message(e.message)}}
  async function refreshCatalog(){try{const data=await req('/api/v52/connectors');el('v52-list').innerHTML=data.connectors.map(c=>`<div class="v51-job"><strong>${safe(c.label)}</strong> · ${safe(c.category)}<div>DISCONNECTED · ${c.capabilities.map(safe).join(', ')}</div><div>Backend execution: disabled</div></div>`).join('')}catch(e){el('v52-list').textContent='Catalog unavailable: '+e.message}}
  el('v52-refresh').onclick=refreshCatalog;
  el('v52-connectors').addEventListener('toggle',()=>{if(el('v52-connectors').open)refreshCatalog()});
@@ -1345,7 +1345,7 @@ diagnostic.ready();
  el('v53-reset').onclick=async()=>{try{await adminReq('/api/v53/reset');message('Backend emergency stop reset');refresh()}catch(e){message(e.message)}};
  el('v53-audit').onclick=async()=>{try{const x=await adminReq('/api/v53/audit','GET');el('v53-audit-result').textContent=JSON.stringify(x.events.slice(0,15),null,2)}catch(e){message(e.message)}};
  async function refreshPolicy(){try{const x=await req('/api/v53/policy');el('v53-policy').textContent='Emergency stop: '+(x.emergency_stop?'ACTIVE':'off')+' · Max steps/job: '+x.max_steps_per_job+' · Provider execution: DISABLED'}catch(e){el('v53-policy').textContent=e.message}}
- renderDraft();if(!new URLSearchParams(location.search).has('fixture')){refreshPolicy();setInterval(()=>{refresh();if(panel.dataset.open==='true')refreshPolicy()},1500)}
+ renderDraft();if(!window.ORBITAL_FIXTURE_MODE){refreshPolicy();setInterval(()=>{refresh();if(panel.dataset.open==='true')refreshPolicy()},1500)}
 })();
 </script>
 <section id="v54-readiness" style="position:fixed;left:12px;bottom:100px;z-index:15;max-width:min(340px,90vw);background:#081c2deF;color:#d8f5ff;border:1px solid #3c7893;border-radius:10px;padding:10px;font:12px system-ui"><details><summary style="cursor:pointer">V54 · Connector readiness (offline)</summary><p>Checks local configuration only. No service is contacted or connected.</p><button id="v54-check" type="button">Check readiness</button><pre id="v54-results" style="white-space:pre-wrap;max-height:180px;overflow:auto">Requires V53 admin token in its panel.</pre></details></section><script>
@@ -1374,7 +1374,7 @@ diagnostic.ready();
   $('v58-safety').textContent=job.state==='awaiting_approval'?'AWAITING ADMIN APPROVAL · No execution':job.state==='paused'?'PAUSED · No execution':job.state==='cancelled'?'CANCELLED · No execution':job.state==='failed'?'FAILED · Review engine logs':'Offline simulation only · No provider calls';
   const signature=[job.id,job.state,cursor].join(':');if(signature!==lastSignature){lastSignature=signature;document.dispatchEvent(new CustomEvent('orbital:backend-simulation',{detail:{jobId:job.id,state:job.state,cursor,step:active?{from:active.from,to:active.to,action:active.action}:null,simulation:true}}))}
  }
- async function refresh(){if(pending||document.hidden)return;pending=true;try{
+ async function refresh(){if(window.ORBITAL_FIXTURE_MODE||pending||document.hidden)return;pending=true;try{
   const r=await fetch('/api/v51/jobs',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json();const jobs=Array.isArray(data.jobs)?data.jobs:[];
   $('v58-connection').textContent='● Local backend connected · read-only monitor';
   const sel=$('v58-job'),current=selected;sel.replaceChildren();const def=document.createElement('option');def.value='';def.textContent='Most recent job';sel.append(def);
@@ -1383,7 +1383,7 @@ diagnostic.ready();
   const job=selected?jobs.find(j=>j.id===selected):jobs[0];
   if(job)display(job);else{$('v58-state').textContent='No backend jobs yet. Create one in V51 · Engine.';$('v58-route').textContent='No active route';$('v58-fill').style.width='0%';$('v58-progress').setAttribute('aria-valuenow','0');for(const node of stationNodes.values())node.classList.remove('active','target');document.dispatchEvent(new CustomEvent('orbital:backend-simulation',{detail:{simulation:true,state:'idle',step:null}}))}
  }catch(e){$('v58-connection').textContent='Backend unavailable · Run START_VIEWER.cmd ('+e.message+')';$('v58-safety').textContent='No live execution. Status unavailable.';document.dispatchEvent(new CustomEvent('orbital:backend-simulation',{detail:{simulation:true,state:'offline',step:null}}))}finally{pending=false}}
- $('v58-refresh').onclick=refresh;if(!new URLSearchParams(location.search).has('fixture')){setInterval(refresh,1000);refresh()}
+ $('v58-refresh').onclick=refresh;if(!window.ORBITAL_FIXTURE_MODE){setInterval(refresh,1000);refresh()}
 })();
 </script>
 <div id="v70-dashboard" aria-label="V70 read-only dashboard">
@@ -1516,7 +1516,7 @@ function render(){
  for(const k of controls)el('v60-'+k).disabled=busy||!enabled[k];
  el('v60-reset').disabled=busy||!stopped;el('v60-stop').disabled=busy||stopped;
 }
-async function refresh(){if(el('v51-panel').dataset.open!=='true')return;try{
+async function refresh(){if(window.ORBITAL_FIXTURE_MODE||el('v51-panel').dataset.open!=='true')return;try{
  const [data,policy]=await Promise.all([request('/api/v51/jobs'),request('/api/v53/policy')]);jobs=data.jobs||[];stopped=!!policy.emergency_stop;render();
  }catch(e){feedback('Local engine unavailable: '+e.message)}}
 el('v60-select').addEventListener('change',()=>{selected=el('v60-select').value;render();const monitor=el('v58-job');if(monitor){monitor.value=selected;monitor.dispatchEvent(new Event('change'))}});
@@ -1535,7 +1535,7 @@ async function security(action){if(busy)return;if(action==='stop'&&!confirm('Eng
 el('v60-stop').onclick=()=>security('stop');el('v60-reset').onclick=()=>security('reset');
 el('v60-audit').onclick=async()=>{try{const data=await request('/api/v53/audit','GET',true);el('v60-audit-output').hidden=false;el('v60-audit-output').textContent=JSON.stringify((data.events||[]).slice(0,20),null,2)}catch(e){feedback(e.message)}};
 el('v51-open').addEventListener('click',()=>{setTimeout(refresh,0)});
-render();if(!new URLSearchParams(location.search).has('fixture'))setInterval(refresh,1200);
+render();if(!window.ORBITAL_FIXTURE_MODE)setInterval(refresh,1200);
 })();
 </script>
 
@@ -1579,12 +1579,12 @@ function show(){const j=chosen?latest.find(x=>x.id===chosen):latest[0];
  $('v61-state').textContent=j?j.name+' · '+j.state.toUpperCase()+' · '+j.cursor+'/'+j.steps.length+' simulated steps':'No saved backend jobs';
  if(j){const v60=$('v60-select');if(v60&&Array.from(v60.options).some(x=>x.value===j.id)){v60.value=j.id;v60.dispatchEvent(new Event('change'))}const monitor=$('v58-job');if(monitor&&Array.from(monitor.options).some(x=>x.value===j.id)){monitor.value=j.id;monitor.dispatchEvent(new Event('change'))}}
 }
-async function refresh(){if(document.hidden)return;try{const r=await fetch('/api/v51/jobs',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const j=await r.json();latest=Array.isArray(j.jobs)?j.jobs:[];
+async function refresh(){if(window.ORBITAL_FIXTURE_MODE||document.hidden)return;try{const r=await fetch('/api/v51/jobs',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const j=await r.json();latest=Array.isArray(j.jobs)?j.jobs:[];
  const select=$('v61-job');select.replaceChildren(new Option('Latest job',''));
  for(const job of latest)select.add(new Option(job.name+' · '+job.state+' · '+job.id.slice(0,8),job.id));
  if(chosen&&!latest.some(j=>j.id===chosen))chosen='';select.value=chosen;show();
  }catch(e){$('v61-state').textContent='Backend unavailable · '+e.message}}
-if(!new URLSearchParams(location.search).has('fixture')){setInterval(refresh,1500);refresh()}
+if(!window.ORBITAL_FIXTURE_MODE){setInterval(refresh,1500);refresh()}
 })();
 </script>
 
@@ -1628,7 +1628,7 @@ function render(events,job){
  }
  if(!ordered.length){const li=document.createElement('li');li.textContent='No recorded events for this workflow.';items.append(li)}
 }
-async function refresh(){if(pending||document.hidden)return;pending=true;
+async function refresh(){if(window.ORBITAL_FIXTURE_MODE||pending||document.hidden)return;pending=true;
  try{
   const id=jobId();if(!id){lastJob='';lastSignature='';meta.textContent='No saved workflow selected.';items.replaceChildren();return}
   if(id!==lastJob){lastJob=id;lastSignature='';items.replaceChildren()}
@@ -1641,7 +1641,7 @@ async function refresh(){if(pending||document.hidden)return;pending=true;
  finally{pending=false}
 }
 refreshButton.onclick=refresh;$('v61-job')?.addEventListener('change',refresh);
-if(!new URLSearchParams(location.search).has('fixture')){setInterval(refresh,1500);refresh()}
+if(!window.ORBITAL_FIXTURE_MODE){setInterval(refresh,1500);refresh()}
 })();
 </script>
 
@@ -1684,7 +1684,7 @@ function diagnose(job,events,now){
  else if(state==='completed'){message='Workflow completed (simulation only).'}
  return {state,count,done,age,severity,message,lastEvent:last?.event||'None',lastTime:last?.timestamp||null,progress:count?Math.round(done*100/count):0};
 }
-async function refresh(){if(pending||document.hidden)return;pending=true;
+async function refresh(){if(window.ORBITAL_FIXTURE_MODE||pending||document.hidden)return;pending=true;
  try{
   const id=pick();stats.replaceChildren();warning.textContent='';
   if(!id){status.textContent='Select a saved backend job to inspect diagnostics.';return}
@@ -1701,7 +1701,7 @@ async function refresh(){if(pending||document.hidden)return;pending=true;
  finally{pending=false}
 }
 refreshButton.addEventListener('click',refresh);document.getElementById('v61-job')?.addEventListener('change',refresh);
-if(!new URLSearchParams(location.search).has('fixture')){setInterval(refresh,2000);refresh()}
+if(!window.ORBITAL_FIXTURE_MODE){setInterval(refresh,2000);refresh()}
 })();
 </script>
 
@@ -1732,7 +1732,7 @@ const states=['awaiting_approval','queued','running','paused','completed','faile
 let pending=false;
 function metric(name,value){const cell=document.createElement('div');const number=document.createElement('strong');number.textContent=String(value);const label=document.createElement('span');label.textContent=name;cell.append(number,label);metrics.append(cell)}
 function safeAge(job,now){const updated=Number(job.updated);return Number.isFinite(updated)&&updated>0?Math.max(0,now-updated):0}
-async function refresh(){if(pending||document.hidden)return;pending=true;
+async function refresh(){if(window.ORBITAL_FIXTURE_MODE||pending||document.hidden)return;pending=true;
  try{
   const response=await fetch('/api/v51/jobs',{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);
   const data=await response.json();if(!Array.isArray(data.jobs))throw Error('Invalid backend response');
@@ -1747,6 +1747,6 @@ async function refresh(){if(pending||document.hidden)return;pending=true;
  }catch(error){status.textContent='Dashboard unavailable: '+error.message;metrics.replaceChildren();recent.replaceChildren()}
  finally{pending=false}
 }
-refreshButton.addEventListener('click',refresh);if(!new URLSearchParams(location.search).has('fixture')){setInterval(refresh,3000);refresh()}
+refreshButton.addEventListener('click',refresh);if(!window.ORBITAL_FIXTURE_MODE){setInterval(refresh,3000);refresh()}
 })();
 </script>
