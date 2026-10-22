@@ -1,0 +1,31 @@
+name: Gateway security regression
+on:
+  pull_request:
+    paths:
+      - 'server.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'test/**'
+      - '.github/workflows/gateway-security.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  security-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Syntax validation
+        run: node --check server.js && node --check test/security.test.js
+      - name: Security regression tests
+        run: npm test
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
