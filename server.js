@@ -99,7 +99,7 @@ const server = http.createServer(async (req, res) => {
     return reply(404, { error: "not found" });
   } catch { return reply(400, { error: "request rejected" }); }
 });
-const wss = new WebSocketServer({ noServer: true, maxPayload: 4096, handleProtocols: () => false });
+const wss = new WebSocketServer({ noServer: true, maxPayload: 4096, handleProtocols: protocols => protocols.has("neural-grid-events") ? "neural-grid-events" : false });
 server.on("upgrade", (req, socket, head) => {
   const deny = () => { socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n"); socket.destroy(); };
   if (req.url !== "/events" || !gatewayToken) return deny();
@@ -107,6 +107,7 @@ server.on("upgrade", (req, socket, head) => {
   if (origin && !allowedOrigins.has(origin)) return deny();
   // Browser clients must present an approved Origin; non-browser clients may omit it.
   const protocols = String(req.headers["sec-websocket-protocol"] || "").split(",").map(x => x.trim());
+  if (!protocols.includes("neural-grid-events")) return deny();
   const protocol = protocols.find(x => x.startsWith("ng-ticket."));
   const ticket = protocol?.slice("ng-ticket.".length);
   prune();
