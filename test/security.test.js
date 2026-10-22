@@ -41,11 +41,21 @@ test("monitor-only gateway security", async t => {
     const valid = await connect(["neural-grid-events", "ng-ticket." + ticket], "http://localhost:3000");
     assert.equal(valid.status, 101);
     assert.equal(valid.protocol, "neural-grid-events");
-    assert.equal((await connect(["ng-ticket." + ticket], "http://localhost:3000")).status, 403);
+    assert.equal((await connect(["neural-grid-events", "ng-ticket." + ticket], "http://localhost:3000")).status, 403);
+    const next = await (await get("/api/events/ticket", { method: "POST", headers: { "x-gateway-token": token } })).json();
+    assert.equal((await connect(["neural-grid-events", "ng-ticket." + next.ticket], "https://malicious.example")).status, 403);
   });
   await t.test("untrusted browser origins denied", async () => {
     assert.equal((await get("/health", { headers: { Origin: "https://malicious.example" } })).status, 403);
     assert.equal((await get("/health", { headers: { Origin: "http://localhost:3000" } })).status, 200);
+  });
+  await t.test("ticket issuance is rate limited", async () => {
+    const statuses = [];
+    for (let i = 0; i < 24; i++) {
+      const response = await get("/api/events/ticket", { method: "POST", headers: { "x-gateway-token": token } });
+      statuses.push(response.status);
+    }
+    assert.ok(statuses.includes(429));
   });
   await t.test("webhook signature and replay guard", async () => {
     const payload = JSON.stringify({ action: "completed", repository: { full_name: "example/repo" } });
