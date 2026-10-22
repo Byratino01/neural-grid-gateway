@@ -38,9 +38,9 @@ test("monitor-only gateway security", async t => {
     assert.equal((await connect([], "http://localhost:3000")).status, 403);
     const response = await get("/api/events/ticket", { method: "POST", headers: { "x-gateway-token": token } });
     const { ticket } = await response.json();
-    const valid = await connect(["ng-ticket." + ticket], "http://localhost:3000");
+    const valid = await connect(["neural-grid-events", "ng-ticket." + ticket], "http://localhost:3000");
     assert.equal(valid.status, 101);
-    assert.equal(valid.protocol, "");
+    assert.equal(valid.protocol, "neural-grid-events");
     assert.equal((await connect(["ng-ticket." + ticket], "http://localhost:3000")).status, 403);
   });
   await t.test("untrusted browser origins denied", async () => {
