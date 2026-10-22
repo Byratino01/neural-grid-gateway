@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
+import WebSocket from "ws";
 
 const port = 21000 + Math.floor(Math.random() * 10000);
 const secret = "test-webhook-secret", token = "test-gateway-token";
@@ -26,6 +27,21 @@ test("monitor-only gateway security", async t => {
     const r = await get("/api/events/ticket", { method: "POST", headers: { "x-gateway-token": token, Origin: "http://localhost:3000" } });
     assert.equal(r.status, 200);
     assert.ok((await r.json()).ticket);
+  });
+  await t.test("WebSocket rejects missing ticket and does not echo valid ticket", async () => {
+    const connect = (protocols, origin) => new Promise(resolve => {
+      const ws = new WebSocket("ws://127.0.0.1:" + port + "/events", protocols, { origin });
+      ws.once("unexpected-response", (_request, response) => { response.resume(); resolve({ status: response.statusCode }); });
+      ws.once("open", () => { const protocol = ws.protocol; ws.close(); resolve({ status: 101, protocol }); });
+      ws.once("error", () => resolve({ status: 0 }));
+    });
+    assert.equal((await connect([], "http://localhost:3000")).status, 403);
+    const response = await get("/api/events/ticket", { method: "POST", headers: { "x-gateway-token": token } });
+    const { ticket } = await response.json();
+    const valid = await connect(["ng-ticket." + ticket], "http://localhost:3000");
+    assert.equal(valid.status, 101);
+    assert.equal(valid.protocol, "");
+    assert.equal((await connect(["ng-ticket." + ticket], "http://localhost:3000")).status, 403);
   });
   await t.test("untrusted browser origins denied", async () => {
     assert.equal((await get("/health", { headers: { Origin: "https://malicious.example" } })).status, 403);
