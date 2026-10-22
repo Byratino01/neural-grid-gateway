@@ -23,6 +23,13 @@ jobs:
           node-version: '22'
       - name: Install dependencies without lifecycle scripts
         run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Export reviewed dependency lockfile candidate
+        if: ${{ hashFiles('package-lock.json') == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-lockfile-candidate
+          path: package-lock.json
+          retention-days: 7
       - name: Syntax validation
         run: node --check server.js && node --check test/security.test.js
       - name: Security regression tests
