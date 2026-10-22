@@ -50,6 +50,15 @@ test("monitor-only gateway security", async t => {
     assert.equal((await get("/health", { headers: { Origin: "https://malicious.example" } })).status, 403);
     assert.equal((await get("/health", { headers: { Origin: "http://localhost:3000" } })).status, 200);
   });
+  await t.test("unauthorized upgrade cannot subscribe to real GitHub event stream", async () => {
+    const blocked = await new Promise(resolve => {
+      const ws = new WebSocket("ws://127.0.0.1:" + port + "/events", ["neural-grid-events", "ng-ticket.invalid"], { origin: "http://localhost:3000" });
+      ws.once("unexpected-response", (_req, response) => { response.resume(); resolve(response.statusCode); });
+      ws.once("error", () => resolve(0));
+      ws.once("open", () => { ws.close(); resolve(101); });
+    });
+    assert.equal(blocked, 403);
+  });
   await t.test("ticket issuance is rate limited", async () => {
     const statuses = [];
     for (let i = 0; i < 24; i++) {
