@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: '22'
       - name: Install dependencies without lifecycle scripts
-        run: npm ci --ignore-scripts --no-audit --no-fund
+        run: npm install --ignore-scripts --no-audit --no-fund
       - name: Syntax validation
         run: node --check server.js && node --check test/security.test.js
       - name: Security regression tests
