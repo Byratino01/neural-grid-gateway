@@ -31,7 +31,7 @@ x-gateway-token: <secret configured only on trusted backend>
 3. `CORS_ORIGIN` must be set to the actual deployed viewer origin(s); exact scheme/host/port must match.
 4. Webhook requests do not use browser CORS; GitHub sends no Origin header. Webhook signature remains mandatory.
 5. CI security tests do not substitute for browser integration tests or a production authorization review.
-6. Commit a reviewed dependency lockfile and change CI to `npm ci` for reproducible installs.
+6. A reviewed dependency lockfile is committed and CI uses `npm ci` (validated in security workflow run #12).
 7. Audit existing GitHub Actions workflow permissions and verify deployment settings before merging.
 
 ## Local/CI tests
