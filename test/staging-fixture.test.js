@@ -53,8 +53,13 @@ test("staging fixture: signed GitHub event reaches scoped read-only WebSocket on
     const registry=await registryResponse.json();
     assert.equal(registry.mode,"monitor");
     assert.equal(registry.connectors.find(c=>c.id==="github").connected,false);
+    const ticketResponse=await fetch(url+"/api/events/ticket",{method:"POST",headers:{
+      authorization:"Bearer "+token,origin:"https://staging-viewer.example"}});
+    assert.equal(ticketResponse.status,201);
+    const {ticket}=await ticketResponse.json();
+    assert.match(ticket,/^[A-Za-z0-9_-]{43}$/);
     const ws=new WebSocket(`ws://127.0.0.1:${port}/events`,
-      ["neural-grid-telemetry-v1","ng-auth."+token],{origin:"https://staging-viewer.example"});
+      ["neural-grid-telemetry-v1","ng-ticket."+ticket],{origin:"https://staging-viewer.example"});
     try{
       await Promise.race([once(ws,"open"),new Promise((_,reject)=>setTimeout(()=>reject(Error("socket timeout")),3000))]);
       const messages=[];
