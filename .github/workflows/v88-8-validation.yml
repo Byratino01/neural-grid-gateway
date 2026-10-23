@@ -1,9 +1,9 @@
 name: V88.8 viewer and gateway validation
 on:
   push:
-    branches: [feature/monitor-mode-gateway-v2, feature/modular-architecture-regression-v1]
+    branches: [feature/monitor-mode-gateway-v2, feature/modular-architecture-regression-v1, feature/v88-8-chatgpt-readonly]
   pull_request:
-    branches: [feature/monitor-mode-gateway-v2, feature/modular-architecture-regression-v1]
+    branches: [feature/monitor-mode-gateway-v2, feature/modular-architecture-regression-v1, feature/v88-8-chatgpt-readonly]
   workflow_dispatch:
 permissions:
   contents: read
