@@ -157,9 +157,40 @@ function serveViewer(req,res) {
     return true;
   } catch { return false; }
 }
+// Per-IP bounded rate limiting and short-lived, single-use WebSocket tickets.
+const requestBuckets = new Map();
+const wsTickets = new Map();
+const maxWsClients = 100;
+const ticketLifetimeMs = 60000;
+function rateAllowed(req, limit = 120) {
+  const now = Date.now();
+  if (requestBuckets.size > 10000) for (const [key,value] of requestBuckets) if (now - value.start > 60000) requestBuckets.delete(key);
+  const key = req.socket.remoteAddress || "unknown";
+  const bucket = requestBuckets.get(key);
+  if (!bucket || now - bucket.start >= 60000) { requestBuckets.set(key,{start:now,count:1}); return true; }
+  return ++bucket.count <= limit;
+}
+function issueWsTicket(session, origin) {
+  const claims = JSON.parse(Buffer.from(session.split(".")[0],"base64url").toString("utf8"));
+  const now = Date.now();
+  for (const [key,value] of wsTickets) if (value.expiresAt <= now) wsTickets.delete(key);
+  if (wsTickets.size >= 10000) return null;
+  const ticket = crypto.randomBytes(32).toString("base64url");
+  wsTickets.set(ticket,{origin,expiresAt:Math.min(now+ticketLifetimeMs,claims.exp*1000),sessionExpiresAt:claims.exp});
+  return {ticket,expiresIn:Math.max(1,Math.ceil((Math.min(now+ticketLifetimeMs,claims.exp*1000)-now)/1000))};
+}
+function consumeWsTicket(ticket,origin) {
+  if (!ticket || !/^[A-Za-z0-9_-]{43}$/.test(ticket)) return null;
+  const entry = wsTickets.get(ticket);
+  if (!entry) return null;
+  wsTickets.delete(ticket);
+  return entry.origin===origin && entry.expiresAt>Date.now() ? entry : null;
+}
+
 const server = http.createServer(async (req,res) => {
   const origin = requestOrigin(req);
   try {
+    if (!rateAllowed(req, req.url === "/api/telemetry/sessions" ? 20 : 120)) return json(res,429,{error:"rate_limited"},origin);
     if (req.method === "OPTIONS") {
       if (!origin || !allowedOrigins.includes(origin)) return json(res,403,{error:"origin_not_allowed"});
       res.writeHead(204,{
@@ -190,6 +221,14 @@ const server = http.createServer(async (req,res) => {
       if (!verifySession(req.headers.authorization?.replace(/^Bearer /,""),origin))
         return json(res,401,{error:"unauthorized"},origin);
       return json(res,200,await openaiConnector.snapshot(),origin);
+    }
+    if (req.method === "POST" && req.url === "/api/events/ticket") {
+      if (!origin || !allowedOrigins.includes(origin)) return json(res,403,{error:"origin_not_allowed"},origin);
+      const session=req.headers.authorization?.replace(/^Bearer /,"");
+      if (!verifySession(session,origin)) return json(res,401,{error:"unauthorized"},origin);
+      const issued=issueWsTicket(session,origin);
+      if (!issued) return json(res,429,{error:"ticket_capacity"},origin);
+      return json(res,201,issued,origin);
     }
     if (req.method === "POST" && req.url === "/webhooks/github") {
       const raw = await readBody(req);
@@ -224,16 +263,15 @@ const wss = new WebSocketServer({noServer:true,handleProtocols: protocols =>
 server.on("upgrade",(req,socket,head) => {
   if (req.url !== "/events") return socket.destroy();
   const origin = String(req.headers.origin || "");
-  if (origin && !allowedOrigins.includes(origin)) return socket.destroy();
+  if (!origin || !allowedOrigins.includes(origin) || clients.size >= maxWsClients) return socket.destroy();
   // Browser WebSocket APIs cannot set arbitrary auth headers. A token is supplied
   // as a second subprotocol; never log this header or put the token in a URL.
   const protocols = String(req.headers["sec-websocket-protocol"] || "").split(",").map(x=>x.trim());
-  const supplied = protocols.find(x=>x.startsWith("ng-auth."))?.slice(8);
-  if (!verifySession(supplied,origin) || !protocols.includes("neural-grid-telemetry-v1"))
-    return socket.destroy();
-  // Enforce expiry after handshake, not only at authentication.
-  const payload=JSON.parse(Buffer.from(supplied.split(".")[0],"base64url").toString("utf8"));
-  wss.handleUpgrade(req,socket,head,ws=>wss.emit("connection",ws,payload.exp));
+  const supplied = protocols.find(x=>x.startsWith("ng-ticket."))?.slice(10);
+  if (!protocols.includes("neural-grid-telemetry-v1")) return socket.destroy();
+  const ticket = consumeWsTicket(supplied,origin);
+  if (!ticket) return socket.destroy();
+  wss.handleUpgrade(req,socket,head,ws=>wss.emit("connection",ws,ticket.sessionExpiresAt));
 });
 wss.on("connection",(ws,expiresAt) => {
   const remainingMs=Math.max(0,expiresAt*1000-Date.now());
