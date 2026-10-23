@@ -165,7 +165,12 @@ const ticketLifetimeMs = 60000;
 function rateAllowed(req, limit = 120) {
   const now = Date.now();
   if (requestBuckets.size > 10000) for (const [key,value] of requestBuckets) if (now - value.start > 60000) requestBuckets.delete(key);
-  const key = req.socket.remoteAddress || "unknown";
+  // Keep the trusted issuer quota independent from browser/static traffic. A heavy
+  // viewer load must not starve the server-only session issuance endpoint, while
+  // both buckets remain bounded per remote address.
+  const route = String(req.url || "").split("?")[0];
+  const bucketClass = route === "/api/telemetry/sessions" ? "session-issuer" : "general";
+  const key = (req.socket.remoteAddress || "unknown") + ":" + bucketClass;
   const bucket = requestBuckets.get(key);
   if (!bucket || now - bucket.start >= 60000) { requestBuckets.set(key,{start:now,count:1}); return true; }
   return ++bucket.count <= limit;
