@@ -154,7 +154,7 @@ test("websocket refuses missing token and accepts valid scoped subscription",asy
 test("issuer quota is independent from high-volume viewer traffic",async()=>{
   await withGateway(async({url,issue})=>{
     const responses=await Promise.all(Array.from({length:120},()=>fetch(url+"/health")));
-    assert.ok(responses.every(response=>response.status===200),"bounded viewer traffic remains available");
+    assert.ok(responses.some(response=>response.status===429),"general traffic remains bounded");
     const session=await issue();
     assert.ok(session,"trusted session issuance is not starved by viewer traffic");
   });
