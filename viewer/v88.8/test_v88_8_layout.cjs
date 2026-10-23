@@ -5,7 +5,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
-const {chromium} = require('playwright');
+let chromium;
+try {
+  ({chromium} = require('playwright-core'));
+} catch {
+  ({chromium} = require('playwright'));
+}
 
 const requestedUrl = process.env.V88_6_URL;
 const output = path.join(__dirname, 'V88.8-screenshots');
