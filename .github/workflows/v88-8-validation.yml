@@ -1,0 +1,82 @@
+name: V88.8 viewer and gateway validation
+on:
+  push:
+    branches: [feature/monitor-mode-gateway-v2]
+  pull_request:
+    branches: [feature/monitor-mode-gateway-v2]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: v88-8-validation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Check JavaScript syntax
+        run: |
+          node --check server.js
+          for file in viewer/v88.8/*.js; do node --check "$file"; done
+      - name: Run gateway, security, telemetry, and static serving tests
+        run: npm test
+      - name: Configure Playwright with runner Chrome
+        run: |
+          npm install --no-save --no-package-lock playwright-core@1.64.1
+          chrome_path="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -n "$chrome_path" ]; then
+            "$chrome_path" --version
+            echo "PLAYWRIGHT_CHROME_PATH=$chrome_path" >> "$GITHUB_ENV"
+            echo "BROWSER_SOURCE=runner-google-chrome" >> "$GITHUB_ENV"
+          else
+            echo "Runner Chrome unavailable; installing Playwright Chromium fallback."
+            npx --no-install playwright-core install --with-deps chromium
+            echo "BROWSER_SOURCE=playwright-chromium" >> "$GITHUB_ENV"
+          fi
+      - name: Verify browser executable
+        run: |
+          echo "Browser source: $BROWSER_SOURCE"
+          if [ -n "${PLAYWRIGHT_CHROME_PATH:-}" ]; then
+            test -x "$PLAYWRIGHT_CHROME_PATH"
+            "$PLAYWRIGHT_CHROME_PATH" --version
+          else
+            node -e "const {chromium}=require('playwright-core'); if (!chromium.executablePath()) process.exit(1); console.log(chromium.executablePath())"
+          fi
+      - name: Start gateway for browser validation
+        env:
+          PORT: 18765
+          GITHUB_WEBHOOK_SECRET: ci-webhook-secret
+          TELEMETRY_SESSION_ISSUER_KEY: ci-issuer-key
+          TELEMETRY_SESSION_SIGNING_KEY: ci-signing-key
+          CORS_ORIGIN: http://127.0.0.1:18765
+        run: |
+          nohup node server.js > gateway-ci.log 2>&1 &
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:18765/health >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat gateway-ci.log
+          exit 1
+      - name: Run V88.8 Chromium layout checks at five viewports
+        env:
+          V88_6_URL: http://127.0.0.1:18765/viewer/v70.html?fixture=1
+          TELEMETRY_SESSION_ISSUER_KEY: ci-issuer-key
+          GITHUB_WEBHOOK_SECRET: ci-webhook-secret
+        run: node viewer/v88.8/test_v88_8_layout.cjs
+      - name: Save validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v88-8-validation-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            gateway-ci.log
+            viewer/v88.8/V88.8-screenshots/**
+

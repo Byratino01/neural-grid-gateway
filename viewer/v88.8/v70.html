@@ -1,0 +1,1726 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#06111f"><title>Orbital Nexus V7 · Mission Control V50.1</title><style>
+:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#06111f;color:#e5f6ff}*{box-sizing:border-box}body{margin:0;overflow:hidden}#scene{position:fixed;inset:0;background:radial-gradient(circle at 50% 70%,#0b3554,#030812 72%)}#scene canvas{display:block}header{position:fixed;left:0;right:0;top:0;z-index:3;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(#04121fe8,#04121f00)}h1{font-size:16px;margin:0;letter-spacing:.13em}small{color:#79c9ec}.controls{display:flex;gap:7px;flex-wrap:wrap}button,.file{border:1px solid #3389a5aa;background:#0c2638df;color:#d9f7ff;border-radius:9px;padding:10px 12px;font:inherit;font-size:12px;cursor:pointer;backdrop-filter:blur(12px)}button.active{background:#145b7e;border-color:#6cdbff}button:focus-visible,.file:focus-within{outline:2px solid cyan}.file input{display:none}aside{position:fixed;right:12px;top:100px;width:min(290px,calc(100vw - 24px));z-index:3;background:#061827df;border:1px solid #3d8ca47a;border-radius:14px;padding:14px;backdrop-filter:blur(18px)}aside h2{font-size:15px;margin:0 0 8px}aside p{font-size:12px;line-height:1.6;color:#b5d5e5}.meta{font-size:11px;color:#79c9ec;margin:8px 0}.agent-note{padding:9px;background:#102d3e;border-radius:8px;margin-top:10px;font-size:12px;line-height:1.45}.station-active{border-color:#80ecff!important;background:#165574!important}#stations{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}#stations button{text-align:left}#status{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom));left:14px;right:14px;z-index:3;pointer-events:none;font-size:11px;color:#92cde6}#picker{display:none}@media(max-width:650px){header{align-items:flex-start;flex-direction:column}aside{top:auto;bottom:58px;left:12px;right:12px;width:auto;padding:10px}aside p{margin:5px 0}#stations{grid-template-columns:repeat(3,1fr)}button,.file{padding:8px}h1{font-size:14px}}
+#workspace{margin-top:10px;border-top:1px solid #3d8ca47a;padding-top:10px;max-height:38vh;overflow:auto}#workspace h3{font-size:12px;letter-spacing:.09em;margin:8px 0}#workspace input,#workspace select{width:100%;margin:3px 0 7px;background:#071b2b;color:#def;border:1px solid #347b98;border-radius:7px;padding:8px;font:inherit;font-size:12px}#workspace .actionrow{display:flex;gap:5px;flex-wrap:wrap}#workspace .actionrow button{flex:1;padding:7px 5px}#workspace .record{font-size:11px;padding:6px 0;border-bottom:1px solid #1a3a4b;overflow-wrap:anywhere}#workspace .muted{color:#8cb9cf;font-size:11px}#workspace .pill{display:inline-block;border:1px solid #377d9c;border-radius:20px;padding:2px 6px;font-size:10px}#workspace .bar{height:5px;background:#17354b;border-radius:5px;overflow:hidden;margin:7px 0}#workspace .bar span{display:block;height:100%;background:#5edaff;transition:width .3s}#workspace summary{cursor:pointer;font-size:12px;padding:5px 0}#workspace details{border-top:1px solid #234355;margin-top:7px}#workspace .notice{font-size:11px;color:#b8deef;line-height:1.45} @media(max-width:650px){#workspace{max-height:24vh}}
+
+/* V11: Station control is bounded to the viewport, with its own visible scrollbar. */
+aside{top:clamp(74px,12vh,100px);bottom:12px;max-height:calc(100dvh - clamp(74px,12vh,100px) - 12px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#4fa9c8 #0a2233}
+#workspace{max-height:none;overflow:visible}
+@media(max-width:650px){aside{top:auto;bottom:54px;max-height:min(66dvh,calc(100dvh - 145px));overflow-y:auto}#workspace{max-height:none}}
+@media(max-height:720px) and (min-width:651px){aside{top:72px;max-height:calc(100dvh - 84px)}}
+
+/* V14 editable workflow rows */
+.workflow-editor-list .record{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.workflow-editor-list .record span{flex:1 1 135px;min-width:0}
+.workflow-editor-list .record button{flex:0 0 auto!important;padding:5px 7px!important;font-size:11px}
+/* V12 compact read-only operations dashboard; keeps V11 scrolling and route logic. */
+.ops-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:8px 0}
+.ops-grid>div{background:#0b2a3d;border:1px solid #28617c;border-radius:7px;padding:7px 4px;text-align:center;font-size:10px;color:#8fc5de}
+.ops-grid strong{display:block;font-size:20px;color:#e5f9ff;margin-top:3px;font-variant-numeric:tabular-nums}
+.ops-heading{color:#91d8f2;font-size:11px;margin:11px 0 5px;font-weight:700;letter-spacing:.04em}
+.ops-route{border:1px solid #2e6680;background:#092235;border-radius:7px;padding:8px;font-size:11px;overflow-wrap:anywhere}
+.ops-stations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ops-stations>div{font-size:10px;border:1px solid #2b546a;background:#0a2232;border-radius:6px;padding:6px;display:flex;justify-content:space-between;gap:5px}
+.ops-stations .on{color:#ff7d88}.ops-stations .idle{color:#7fe1ff}
+.ops-recent{max-height:110px;overflow-y:auto;font-size:10px;color:#badbec}
+.ops-recent>div{padding:4px 0;border-bottom:1px solid #224258;overflow-wrap:anywhere}
+.ops-activity{display:grid;gap:6px;margin-top:9px}
+.ops-activity-row{display:grid;grid-template-columns:75px minmax(0,1fr) 25px;align-items:center;gap:7px;font-size:10px;color:#b7e6fb}
+.ops-activity-track{height:7px;background:#102c40;border:1px solid #24516a;border-radius:10px;overflow:hidden}
+.ops-activity-fill{height:100%;background:linear-gradient(90deg,#0d77b7,#72e3ff);transition:width .18s}
+.ops-actions{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.ops-actions button{font-size:11px;padding:7px 9px}
+.ops-note{font-size:10px;color:#86b6ce}
+
+/* V15: retractable Mission Control drawer, leaving the orbital scene unobstructed. */
+aside#mission-panel{display:flex;flex-direction:column;padding:0;overflow:hidden;max-height:calc(100dvh - clamp(74px,12vh,100px) - 12px);transition:width .2s ease,box-shadow .2s ease}
+#mission-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:48px;border:0;border-radius:13px;background:#0a3047;color:#e4f8ff;text-align:left;font-weight:700;font-size:13px;letter-spacing:.025em;padding:12px 14px}
+#mission-toggle:hover{background:#12445f}
+#mission-state{font-size:10px;color:#8fd6ee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:135px}
+#mission-state[data-state="running"]{color:#ff9ba4}
+#mission-state[data-state="failed"]{color:#ffcc84}
+#mission-panel.is-collapsed:has(#mission-state[data-state="running"]){border-color:#e87988}
+#mission-toggle .mission-left{display:flex;flex-direction:column;gap:3px;min-width:0}
+#mission-toggle .mission-right{display:flex;align-items:center;gap:7px}
+#mission-state[data-state="running"]::before{content:"● ";color:#ff6272}
+#mission-mini-track{height:3px;width:100%;background:#173a4f;overflow:hidden;display:none}
+#mission-panel.is-collapsed #mission-mini-track[data-active="true"]{display:block}
+#mission-mini-fill{height:100%;width:0;background:linear-gradient(90deg,#2789d5,#78eaff);transition:width .25s}
+#mission-toggle:focus-visible{outline:2px solid #82e6ff;outline-offset:2px}
+#mission-quick{display:none;padding:8px 12px 10px;background:#071d2d;border-top:1px solid #24506a;gap:8px;align-items:center;justify-content:space-between}
+#mission-panel.is-collapsed #mission-quick[data-active="true"]{display:flex}
+#mission-quick-route{font-size:11px;color:#a7e7ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+#mission-quick-open{flex:none;border:1px solid #346b85;border-radius:7px;background:#12384e;color:#e1f8ff;padding:6px 9px;font-size:10px;cursor:pointer}
+#mission-quick-open:hover{background:#20536c}
+#mission-quick-open:focus-visible{outline:2px solid #82e6ff}
+#mission-ticker{display:none;padding:7px 12px 9px;border-top:1px solid #1d455e;background:#071925;gap:4px}
+#mission-panel.is-collapsed #mission-ticker[data-visible="true"]{display:grid}
+#mission-ticker-head{display:flex;justify-content:space-between;gap:8px;align-items:center}
+#mission-ticker-label{font-size:10px;color:#80b6cf;text-transform:uppercase;letter-spacing:.07em}
+#mission-ticker-view{border:0;background:none;color:#8ce3ff;font-size:10px;text-decoration:underline;cursor:pointer;padding:3px}
+#mission-ticker-text{font-size:11px;color:#d4edf7;white-space:normal;overflow-wrap:anywhere;line-height:1.4;max-height:3em;overflow:hidden}
+#mission-ticker-time{font-size:10px;color:#6e9bb3}
+#mission-alert{display:none;padding:9px 12px;background:#102838;border-top:1px solid #285b76;gap:7px;align-items:center;justify-content:space-between}
+#mission-panel.is-collapsed #mission-alert[data-visible="true"]{display:flex}
+#mission-alert[data-kind="failed"]{background:#3b1b2b;border-top-color:#b75a6a}
+#mission-alert[data-kind="completed"]{background:#12372e;border-top-color:#3e9d83}
+#mission-alert-text{color:#f2faff;font-size:11px;min-width:0;overflow-wrap:anywhere}
+#mission-alert[data-fading="true"]{opacity:0;transform:translateY(-7px);pointer-events:none;transition:opacity .65s ease,transform .65s ease}
+#mission-alert[data-fading="false"]{opacity:1;transform:translateY(0);transition:opacity .2s ease,transform .2s ease}
+@media(prefers-reduced-motion:reduce){#mission-alert{transition:none!important}}
+#mission-alert-review{display:none;flex:none;border:1px solid #b86a79;background:#4c2834;color:#fff;border-radius:6px;font-size:10px;padding:6px;cursor:pointer}
+#mission-alert[data-kind="failed"] #mission-alert-review{display:inline-block}
+#workflow-stop-confirm{display:none;margin-top:8px;padding:10px;border:1px solid #a55b68;border-radius:9px;background:#3a1e2b;color:#f9e9ed}
+#workflow-stop-confirm[data-open="true"]{display:block}
+#workflow-stop-confirm p{margin:0 0 8px;font-size:12px;line-height:1.45}
+#workflow-stop-confirm .stop-confirm-actions{display:flex;gap:8px;flex-wrap:wrap}
+#workflow-stop-confirm button{padding:8px 12px;border-radius:7px;font-size:11px;cursor:pointer}
+#workflow-stop-yes{background:#963d51;border:1px solid #d97d91;color:white}
+#workflow-stop-no{background:#163a4c;border:1px solid #56849b;color:white}
+#mission-alert-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+#mission-alert-dismiss{flex:none;border:1px solid #517083;background:transparent;color:#e5f7ff;border-radius:6px;font-size:10px;padding:6px;cursor:pointer}
+
+
+
+#mission-toggle .chevron{font-size:17px;transition:transform .2s}
+#mission-panel:not(.is-collapsed) #mission-toggle .chevron{transform:rotate(180deg)}
+#mission-body{padding:0 14px 14px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#4fa9c8 #0a2233;min-height:0}
+#mission-panel.is-collapsed{width:min(230px,calc(100vw - 24px));bottom:auto;max-height:min(65dvh,420px);overflow-y:auto;overscroll-behavior:contain}
+#mission-panel.is-collapsed #mission-body{display:none}
+#mission-panel.is-collapsed #mission-toggle{min-height:48px;position:sticky;top:0;z-index:2}
+@media(max-width:650px){aside#mission-panel{top:auto;bottom:54px;max-height:min(66dvh,calc(100dvh - 145px));left:12px;right:12px;width:auto}#mission-panel.is-collapsed{left:auto;right:12px;bottom:54px;width:min(230px,calc(100vw - 24px));max-height:min(65dvh,420px);overflow-y:auto;overscroll-behavior:contain}}
+@media(max-height:720px) and (min-width:651px){aside#mission-panel{top:72px;max-height:calc(100dvh - 84px)}}
+#orbital-status-hud{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:8;display:none;max-width:min(460px,calc(100vw - 30px));width:max-content;min-width:210px;padding:9px 14px;border:1px solid #33748f;border-radius:11px;background:rgba(5,23,37,.92);box-shadow:0 8px 24px #0007;color:#d8f5ff;pointer-events:none;text-align:center}
+#orbital-status-hud[data-active="true"]:not([data-hidden="true"]){display:block}
+#orbital-status-hud[data-position="left"]{left:12px;transform:none}
+#orbital-status-hud[data-position="right"]{left:auto;right:12px;transform:none}
+#orbital-status-hud[data-position="center"]{left:50%;right:auto;transform:translateX(-50%)}
+#drawer-preferences{padding:8px 0;font-size:11px;color:#b4e7f8}
+#drawer-preferences input{accent-color:#62d9ff}
+#mission-ticker[data-suppressed="true"]{display:none!important}
+#mission-alert[data-kind="failed"]{border-left:3px solid #ff8597}
+#mission-alert[data-kind="completed"]{border-left:3px solid #80e5b6}
+#hud-position{background:#0a2739;color:#d8f5ff;border:1px solid #39728e;border-radius:6px;padding:5px;font-size:11px;max-width:100%}
+@media(max-width:600px){#orbital-status-hud[data-position="left"],#orbital-status-hud[data-position="right"]{max-width:45vw;min-width:0}}
+
+#orbital-status-hud[data-compact="true"] #orbital-hud-progress{display:none}
+#orbital-status-hud[data-compact="true"]{padding:6px 11px}
+#orbital-status-hud[data-compact="true"] #orbital-hud-title{font-size:9px}
+#orbital-status-hud[data-compact="true"] #orbital-hud-route{font-size:11px}
+#hud-preferences{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 0}
+#hud-preferences label{font-size:11px;color:#b4e7f8;display:flex;align-items:center;gap:4px}
+#hud-preferences input{accent-color:#62d9ff}
+
+#orbital-hud-title{font-size:10px;letter-spacing:.12em;color:#7fbbd7;text-transform:uppercase}
+#orbital-hud-route{font-size:12px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#orbital-hud-progress{margin-top:7px;height:3px;background:#123c53;border-radius:3px;overflow:hidden}
+#orbital-hud-fill{height:100%;background:#67dfff;transition:width .25s}
+#orbital-status-hud[data-failed="true"]{border-color:#b96877}
+#orbital-status-hud[data-failed="true"] #orbital-hud-title{color:#ff9fac}
+@media(max-width:600px){#orbital-status-hud{top:7px;min-width:155px;max-width:50vw;padding:7px 9px}#orbital-hud-route{font-size:10px}}
+@media(prefers-reduced-motion:reduce){#orbital-hud-fill{transition:none}}
+#shortcut-help{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;padding:16px;background:#010b16bb}
+#shortcut-help[data-open="true"]{display:flex}
+#shortcut-card{width:min(390px,100%);max-height:80dvh;overflow:auto;background:#092438;border:1px solid #4e98b4;border-radius:14px;padding:18px;color:#e3f8ff;box-shadow:0 18px 60px #000b}
+#shortcut-card h2{margin:0 0 12px;font-size:17px}
+#shortcut-card p{font-size:12px;color:#a6d1e4;line-height:1.5}
+#shortcut-card kbd{display:inline-block;min-width:30px;text-align:center;padding:4px 7px;border:1px solid #4b8096;border-radius:5px;background:#12384e;color:#effcff}
+#shortcut-card .shortcut-line{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:9px 0;font-size:12px}
+#shortcut-close,#shortcut-open{cursor:pointer;border:1px solid #4d8eaa;background:#0c3b54;color:#e2faff;border-radius:7px;padding:7px 10px}
+#shortcut-open{position:fixed;bottom:14px;left:14px;z-index:11;font-size:12px}
+#glb-drop-zone{position:fixed;inset:12px;z-index:100;display:none;align-items:center;justify-content:center;border:3px dashed #69dcff;border-radius:20px;background:#041b30e9;pointer-events:none;color:#d8f7ff;font-weight:700;font-size:clamp(16px,3vw,30px);text-align:center;padding:30px}
+#glb-drop-zone[data-visible="true"]{display:flex}
+#model-inspector{position:fixed;left:14px;bottom:calc(56px + env(safe-area-inset-bottom));z-index:4;max-width:min(360px,calc(100vw - 28px));padding:10px 12px;border:1px solid #337e99;border-radius:10px;background:#071d2de8;color:#c5eaff;font-size:11px;line-height:1.6;pointer-events:auto;display:none;box-shadow:0 6px 24px #0007}
+#model-inspector[data-visible="true"]{display:block}
+#model-inspector-head{display:flex;align-items:center;gap:8px;justify-content:space-between}
+#model-inspector-head strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#model-inspector-export{border:1px solid #41849e;background:#0d354b;color:#def;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px}
+#model-inspector-actions{display:flex;gap:5px;align-items:center}
+#model-inspector-toggle{border:1px solid #41849e;background:#0d354b;color:#def;border-radius:5px;padding:3px 8px;cursor:pointer;flex-shrink:0;font-size:11px}
+#model-inspector[data-expanded="false"] #model-inspector-details{display:none}
+#model-inspector[data-expanded="false"]{max-width:min(280px,calc(100vw - 28px))}
+
+#model-inspector strong{color:#f0fbff;font-size:12px}
+#model-inspector .model-dim{color:#8ac1d8}
+@media(max-width:650px){#model-inspector{bottom:calc(58px + env(safe-area-inset-bottom));font-size:10px;max-width:52vw}}
+#station-action-panel{position:fixed;right:14px;top:76px;z-index:12;width:min(310px,calc(100vw - 28px));padding:13px;border:1px solid #478daa;border-radius:12px;background:rgba(6,27,43,.96);box-shadow:0 12px 35px #0009;color:#dff7ff;display:none}
+#station-action-panel[data-open="true"]{display:block}
+#station-action-panel .sap-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#station-action-panel h2{font-size:16px;margin:0}
+#station-action-panel p{font-size:11px;line-height:1.5;color:#a9cfe0}
+#station-action-panel .sap-buttons{display:flex;gap:6px;flex-wrap:wrap}
+#station-action-panel button{border:1px solid #4a91ad;background:#123e55;color:#e7faff;border-radius:7px;padding:8px 10px;cursor:pointer;font-size:11px}
+#station-action-panel button:disabled{opacity:.45;cursor:not-allowed}
+#station-action-panel #sap-close{font-size:16px;padding:3px 9px}
+#sap-feedback{min-height:15px;color:#83e7c8!important}
+@media(max-width:650px){#station-action-panel{top:65px;right:8px;width:min(285px,calc(100vw - 16px));max-height:38dvh;overflow-y:auto}}
+#logical-node-layer{position:fixed;inset:0;pointer-events:none;z-index:4;overflow:hidden}
+.logical-node{position:absolute;transform:translate(-50%,-50%);border:1px solid #68c8eb;background:rgba(6,29,45,.92);color:#e3faff;border-radius:20px;padding:5px 9px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 0 12px #10bdf655;font-size:10px;pointer-events:auto;cursor:pointer}
+.logical-node:hover,.logical-node:focus-visible{background:#185675;outline:2px solid #b5eeff}
+.logical-node[data-route="source"]{border-color:#ffb37b;box-shadow:0 0 16px #ff996d99}
+.logical-node[data-route="destination"]{border-color:#ff6d87;box-shadow:0 0 16px #ff6d8799}
+#logical-route-caption{position:fixed;left:50%;bottom:66px;transform:translateX(-50%);z-index:5;max-width:min(500px,90vw);padding:8px 12px;border-radius:9px;border:1px solid #ad6577;background:#211a2be8;color:#ffdce5;font-size:11px;text-align:center;pointer-events:none}
+#logical-route-caption[hidden]{display:none}
+.logical-node[data-selected="true"]{border-color:#ffac64;box-shadow:0 0 15px #ff985c88}
+#logical-nodes-setting{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:11px;color:#a7d7e9}
+#logical-nodes-setting input{accent-color:#62d9ff}
+</style><link rel="stylesheet" href="./v70-dashboard.css">
+<style>#v87-github-workflows{margin-top:10px;padding:9px;border:1px solid #28586e;border-radius:8px;color:#c8e6f2;font:12px system-ui}#v87-github-workflows h4{font-size:11px;letter-spacing:.08em;margin:0 0 6px}#v87-github-workflows p{margin:4px 0}#v87-github-runs{max-height:130px;overflow:auto;margin:5px 0;padding-left:19px}#v87-github-runs li{margin:3px 0;overflow-wrap:anywhere}#v87-github-indicator[data-activity=active]{color:#79e4ff}</style></head><body><div id="glb-drop-zone" data-visible="false" role="status">Drop GLB to load workstation<br>Existing scene stays until the new model loads</div><div id="orbital-status-hud" data-active="false" data-failed="false" data-hidden="false" data-compact="false" data-position="center" role="status" aria-live="off"><div id="orbital-hud-title">Workflow active</div><div id="orbital-hud-route"></div><div id="orbital-hud-progress"><div id="orbital-hud-fill"></div></div></div><div id="scene"></div><div id="logical-node-layer" aria-label="Virtual station markers over 3D scene"></div><div id="logical-route-caption" hidden role="status"></div><section id="station-action-panel" data-open="false" aria-label="Selected station controls"><div class="sap-head"><h2 id="sap-name">Station</h2><button type="button" id="sap-close" aria-label="Close station controls">×</button></div><p id="sap-role"></p><p id="sap-connection"></p><div class="sap-buttons"><button type="button" id="sap-source">Use as source</button><button type="button" id="sap-destination">Use as destination</button><button type="button" id="sap-add-route">+ Add route step</button><button type="button" id="sap-workflow">Open workflow builder</button></div><p id="sap-route" aria-live="polite">Select a source and destination to build a route.</p><p id="sap-feedback" role="status" aria-live="polite"></p><p>Local simulation only · no service connection or commands are sent.</p></section><div id="model-inspector" data-visible="false" data-expanded="true" role="group" aria-label="Imported 3D model information"><div id="model-inspector-head"><strong id="model-inspector-name"></strong><span id="model-inspector-actions"><button id="model-inspector-export" type="button" title="Save model metrics as JSON">Export</button><button id="model-inspector-toggle" type="button" aria-expanded="true" aria-controls="model-inspector-details">Hide details</button></span></div><div id="model-inspector-details" class="model-dim" role="status" aria-live="polite"></div></div><button id="shortcut-open" type="button" aria-haspopup="dialog" aria-controls="shortcut-help" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button><div id="shortcut-help" data-open="false" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" aria-hidden="true"><div id="shortcut-card"><h2>Keyboard shortcuts</h2><div class="shortcut-line"><span>Open or retract Mission Control</span><kbd>M</kbd></div><div class="shortcut-line"><span>Show or hide this help</span><kbd>?</kbd></div><div class="shortcut-line"><span>Close help or retract Mission Control</span><kbd>Esc</kbd></div><p>Shortcuts do not run, stop or modify a workflow. They are disabled while typing in form fields.</p><button id="shortcut-close" type="button">Close</button></div></div><header><div><h1>NEURAL GRID <small>V7 · ORBITAL NEXUS</small></h1><small>REV 32 GLB · VIEWER V62 · NON-INTERRUPTING MISSION DRAWER</small></div><div class="controls"><button id="command" class="active">Command Mode</button><button id="explore">Explore Mode</button><button id="reset">Reset Camera</button><button id="demo" style="background:#69222d;border:2px solid #ff5c68;font-weight:700">▶ Demo GPT → GitHub · Outer Ring</button><button id="complete" style="background:#144e5c;border:2px solid #67dff6;font-weight:700">✓ Complete Task · Restore Blue</button><button id="diagnostics-export" type="button">Save diagnostics</button><label class="file">Load GLB<input type="file" id="picker" accept=".glb,model/gltf-binary"></label></div></header><aside id="mission-panel" class="is-collapsed"><button id="mission-toggle" type="button" aria-expanded="false" aria-controls="mission-body"><span class="mission-left"><span id="mission-label">▤ Mission Control</span><span id="mission-state" data-state="idle" role="status" aria-live="polite">No active workflow</span></span><span class="mission-right"><span class="chevron" aria-hidden="true">⌄</span></span></button><div id="mission-mini-track" data-active="false" role="progressbar" aria-label="Workflow progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="mission-mini-fill"></div></div><div id="mission-quick" data-active="false"><span id="mission-quick-route">Idle</span><button type="button" id="mission-quick-open">View workflow</button></div><div id="mission-alert" data-visible="false" data-fading="false" data-kind=""><span id="mission-alert-text" role="status"></span><span id="mission-alert-actions"><button type="button" id="mission-alert-review">Review failure</button><button type="button" id="mission-alert-dismiss" aria-label="Dismiss mission notification">Dismiss</button></span></div><div id="mission-ticker" data-visible="false" role="status"><div id="mission-ticker-head"><span id="mission-ticker-label">Latest activity</span><button type="button" id="mission-ticker-view">Open event history</button></div><div id="mission-ticker-text"></div><span id="mission-ticker-time"></span></div><div id="mission-body"><h2 id="selected">Station Control</h2><p id="details">Choose a station to inspect. The application is not yet connected to live APIs.</p><div id="stations"></div><div id="virtual-stations" aria-label="Custom logical stations"></div><label id="logical-nodes-setting"><input type="checkbox" id="show-logical-nodes" checked> Show logical nodes over 3D (first 12)</label><div class="meta" id="connection">Connection: Not configured · Demo interaction only</div><div class="agent-note" id="agent-response" aria-live="polite">OUTER RING · BLUE IDLE · NO LIVE FEED</div><div class="meta">Gateway event URL (disabled until secure connection setup)</div><input id="events-url" placeholder="https://your-gateway/events" style="width:100%;padding:9px;background:#071b2b;color:#def;border:1px solid #347b98;border-radius:8px"><button id="connect-events">Event Feed Disabled</button><div id="workspace"><details open id="ops-dashboard"><summary>Operations dashboard · Local</summary>
+<div id="ops-stats" class="ops-grid" aria-live="polite"><div>Queued<strong id="ops-queued">0</strong></div><div>Active<strong id="ops-active">0</strong></div><div>Completed<strong id="ops-completed">0</strong></div><div>Failed<strong id="ops-failed">0</strong></div></div>
+<div class="ops-heading">Active route</div><div class="ops-route" id="ops-route">None · Network idle</div>
+<div class="ops-heading">Station activity</div><div id="ops-stations" class="ops-stations"></div>
+<div class="ops-heading">Station activity · this session</div><div id="ops-activity" class="ops-activity"></div>
+<div class="ops-heading">Recent operations</div><div id="ops-recent" class="ops-recent">No events yet</div>
+<div class="ops-actions"><button id="ops-export">Export Dashboard Report</button><button id="ops-reset">Reset Dashboard Counters</button></div>
+<div class="ops-note">Counts and activity represent local simulations only; no connected service execution.</div>
+<p class="muted">Dashboard reflects local simulation only. No external services are connected.</p></details><div id="hud-preferences"><label><input id="hud-visible" type="checkbox" checked> 3D status HUD</label><label><input id="hud-compact" type="checkbox"> Compact HUD</label><label for="hud-position">HUD position</label><select id="hud-position" aria-label="3D status HUD position"><option value="center">Top center</option><option value="left">Top left</option><option value="right">Top right</option></select></div><div id="drawer-preferences"><label><input id="drawer-show-activity" type="checkbox" checked> Show latest activity when collapsed</label></div><h3>MISSION CONTROL LAB <span class="pill">OFFLINE DEMO</span></h3><div id="station-inspector" class="notice">Select a station to inspect its role and connector status.</div><details open><summary>Task console</summary><input id="task-name" maxlength="100" placeholder="Task name (local demo only)"><div class="actionrow"><button id="task-start">Start GPT → GitHub Demo</button><button id="task-finish">Complete</button><button id="task-fail">Fail</button></div><div class="bar"><span id="task-progress" style="width:0%"></span></div><div class="muted" id="task-label">No task running</div></details><details><summary>Connector registry</summary><input id="connector-name" maxlength="50" placeholder="Connector name"><select id="connector-kind"><option>AI model</option><option>Development</option><option>Deployment</option><option>Automation</option><option>Storage</option><option>Custom</option></select><div class="actionrow"><button id="connector-add">Add</button><button id="connector-export">Export JSON</button><button id="connector-import">Import JSON</button></div><input type="file" id="connector-file" accept="application/json,.json" hidden><input id="connector-search" type="search" maxlength="50" placeholder="Filter custom stations by name or type" aria-label="Filter custom stations"><div id="connector-count" class="muted" aria-live="polite"></div><div id="connector-list"></div><p class="muted">Custom stations appear in Station Control and the workflow builder. They are logical nodes only: Revision 32 geometry is unchanged and no physical red route is invented.</p><p class="muted">Registry entries are configuration placeholders, not authenticated connections. Stored locally in this browser.</p></details><details><summary>Secure gateway · Architecture preview</summary>
+<div class="notice"><strong>OFFLINE / DISCONNECTED</strong> — Backend scaffold is included in the ZIP but not started automatically. No browser tokens, API keys, or live commands.</div>
+<p class="muted">Backend endpoints: <code>/health</code>, <code>/api/connectors</code>, <code>/api/execute</code> (disabled). Health endpoint returns service state only; all connector execution remains blocked.</p>
+<p class="muted">Security boundary: backend environment variables, localhost binding, explicit origin restrictions, read-only connector metadata, permission-denied execution.</p>
+</details><details><summary>Mission queue and timeline</summary><input id="mission-name" maxlength="90" placeholder="Mission title"><div class="actionrow"><button id="mission-add">Queue Mission</button><button id="mission-next">Run Next</button><button id="mission-cancel">Cancel Active</button></div><div class="actionrow"><button id="mission-template-code">+ Code Review</button><button id="mission-template-deploy">+ Deploy Preview</button><button id="mission-template-audit">+ OCR Audit</button></div><div class="actionrow"><button id="mission-save">Export Plan</button><button id="mission-load">Import Plan</button><button id="mission-clear">Clear Queue</button></div><input type="file" id="mission-file" accept="application/json,.json" hidden><div id="mission-queue" class="muted">Queue empty.</div><div class="muted">Simulation only. Missions use the validated ChatGPT → outer ring → GitHub route.</div></details><details open><summary>Critical safeguards · Local simulation</summary><div class="notice"><strong>DEFAULT DENY · OFFLINE</strong> — External execution is disabled. Permissions below authorize only local workflow simulations, not provider API calls.</div><div class="actionrow"><label><input id="security-simulation" type="checkbox"> Permit local workflow simulation</label></div><div class="actionrow"><label><input id="security-approve" type="checkbox" checked> Require confirmation before every simulated workflow</label></div><div class="actionrow"><button id="security-stop" type="button" style="border-color:#e66;color:#ffcccc">EMERGENCY STOP</button><button id="security-reset" type="button">Reset simulation lock</button></div><div id="security-state" role="status" aria-live="polite">Simulation locked until explicitly enabled.</div><div class="notice"><strong>TRUSTED BOUNDARY · BACKEND DEFAULT DENY</strong> — AI proposals and imported instructions cannot grant privileges. Backend API, token, job and cost budgets are zero until a future trusted server-side authorization system exists.</div><div class="actionrow"><label>Max simulated steps per run <input id="sim-budget-steps" type="number" min="1" max="50" value="12" style="width:64px"></label><label>Max simulated steps per session <input id="sim-budget-total" type="number" min="1" max="500" value="60" style="width:70px"></label></div><div id="sim-budget-state" class="muted" role="status">Local simulation step budget: 0 consumed · no real API calls or spending.</div><div id="security-approval" hidden role="group" aria-label="Workflow execution approval"><p id="security-approval-summary"></p><div class="actionrow"><button id="security-yes" type="button">Approve this simulation</button><button id="security-no" type="button">Deny</button></div></div><p class="muted">Permission boundary: backend connectors have no execution permissions; browser settings cannot authorize real service actions. Treat imported workflows and external text as untrusted.</p></details><details><summary>Safety recovery · Audit and checkpoints</summary><p class="muted">Local-only audit (last 200 events, redacted), and manual workflow draft recovery. Restoring a checkpoint never resumes execution.</p><div class="actionrow"><button type="button" id="audit-export">Export Audit</button><button type="button" id="audit-clear">Clear Audit</button><button type="button" id="checkpoint-save">Save Checkpoint</button><button type="button" id="checkpoint-restore">Restore Checkpoint</button></div><div id="checkpoint-status" class="muted" role="status">No checkpoint restored.</div><div id="audit-status" class="muted" role="status">Audit stored locally in this browser.</div></details><details open><summary>Visual workflow builder · Offline</summary>
+<p class="muted">Create an ordered sequence of station actions. Six perimeter stations can exchange animated signals along the outer ring. Routes involving the central Render hub remain timeline-only.</p>
+<input id="workflow-name" maxlength="80" placeholder="Workflow name">
+<div class="actionrow"><select id="workflow-from"><option>ChatGPT</option><option>GitHub</option><option>Browser</option><option>Netlify</option><option>Higgsfield</option><option>Storage</option><option>Render</option></select><span>→</span><select id="workflow-to"><option>GitHub</option><option>ChatGPT</option><option>Browser</option><option>Netlify</option><option>Higgsfield</option><option>Storage</option><option>Render</option></select></div>
+<input id="workflow-action" maxlength="90" placeholder="Step description (e.g. Review pull request)">
+<div class="actionrow"><button id="workflow-preset-dev">+ Development Flow</button><button id="workflow-preset-media">+ Media Flow</button><button id="workflow-preset-data">+ Data Flow</button></div>
+<div class="actionrow"><button id="workflow-preflight" type="button">Check Workflow</button><button id="workflow-preflight-export" type="button" disabled>Export Check</button></div><div id="workflow-preflight-result" role="status" aria-live="polite" class="muted">Check workflow readiness before running. This does not execute any steps.</div><div class="actionrow"><button id="workflow-add-step">Add Step</button></div><details id="v62-demo-controls"><summary>Legacy browser-only simulation controls (optional)</summary><p class="muted">These buttons operate the original browser demo, not the persistent backend queue. Use Queue Draft in Backend for approval-controlled simulations.</p><div class="actionrow"><button id="workflow-run">Run Workflow</button><button id="workflow-next">Complete Step</button><button id="workflow-fail">Fail Step</button><button id="workflow-retry">Retry Step</button><button id="workflow-stop">Stop</button></div><div id="workflow-stop-confirm" data-open="false" role="group" aria-label="Confirm stop workflow"><p><strong>Stop this workflow?</strong> This cancels the current local simulation. Closing Mission Control does not stop it.</p><div class="stop-confirm-actions"><button type="button" id="workflow-stop-yes">Yes, stop workflow</button><button type="button" id="workflow-stop-no">Keep running</button></div></div>
+</details><div class="bar"><span id="workflow-progress" style="width:0%"></span></div><div id="workflow-steps" class="muted workflow-editor-list">No steps configured.</div><div class="muted" id="workflow-run-status">No workflow running.</div>
+<div class="actionrow"><button id="workflow-export">Export Workflow</button><button id="workflow-report">Export Run Report</button><button id="workflow-import">Import Workflow</button><button id="workflow-reset">Clear Steps</button></div>
+<input type="file" id="workflow-file" accept=".json,application/json" hidden>
+<div class="muted" id="workflow-status">Local simulation only · no external service calls.</div>
+</details><details open><summary>Event history</summary><div id="event-list" aria-live="polite"></div><div class="actionrow"><button id="event-export">Export Events</button><button id="event-clear">Clear history</button></div></details></div></div></aside><div id="status">Waiting for 3D model. Load the GLB exported from your Higgsfield project. · No AI credits required.</div><script>
+(function(){
+ const panel=document.getElementById('mission-panel'),toggle=document.getElementById('mission-toggle');
+ function setOpen(open){
+  panel.classList.toggle('is-collapsed',!open);
+  toggle.setAttribute('aria-expanded',String(open));
+  document.getElementById('mission-label').textContent=open?'▤ Mission Control · Close':'▤ Mission Control';
+  try{localStorage.setItem('orbital.missionDrawer.open',String(open))}catch(_){}
+ }
+ try{setOpen(localStorage.getItem('orbital.missionDrawer.open')==='true')}catch(_){setOpen(false)}
+ toggle.addEventListener('click',()=>setOpen(panel.classList.contains('is-collapsed')));
+ document.getElementById('mission-ticker-view').addEventListener('click',()=>{
+  setOpen(true);
+  const list=document.getElementById('event-list');
+  const section=list?.closest('details');
+  if(section)section.open=true;
+  if(list)requestAnimationFrame(()=>list.scrollIntoView({behavior:'smooth',block:'nearest'}));
+ });
+ document.getElementById('mission-quick-open').addEventListener('click',()=>{
+  setOpen(true);
+  const section=document.getElementById('workflow-run-status');
+  const details=section?.closest('details');
+  if(details)details.open=true;
+  if(section)requestAnimationFrame(()=>section.scrollIntoView({behavior:'smooth',block:'nearest'}));
+ });
+ const help=document.getElementById('shortcut-help'),helpOpen=document.getElementById('shortcut-open'),helpClose=document.getElementById('shortcut-close');
+ let previousFocus=null;
+ function showHelp(open){
+  if(open){previousFocus=document.activeElement;help.dataset.open='true';help.setAttribute('aria-hidden','false');helpClose.focus()}
+  else{help.dataset.open='false';help.setAttribute('aria-hidden','true');if(previousFocus?.isConnected)previousFocus.focus()}
+ }
+ helpOpen.addEventListener('click',()=>showHelp(true));
+ helpClose.addEventListener('click',()=>showHelp(false));
+ help.addEventListener('click',e=>{if(e.target===help)showHelp(false)});
+ document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&help.dataset.open==='true'){e.preventDefault();showHelp(false);return}
+  if((e.key==='?'||e.key==='F1')&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.target.closest('input,textarea,select,[contenteditable="true"]')){e.preventDefault();showHelp(help.dataset.open!=='true');return}
+  if(help.dataset.open==='true')return;
+  if(e.key==='Escape'&&!panel.classList.contains('is-collapsed'))setOpen(false);
+  if(e.key.toLowerCase()==='m'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.repeat&&!e.target.closest('input,textarea,select,[contenteditable="true"]')){
+   setOpen(panel.classList.contains('is-collapsed'));
+  }
+ });
+})();
+</script><script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js","three/addons/":"./vendor/three/examples/jsm/"}}</script><script>
+(() => {
+ const picker=document.getElementById('picker');picker.disabled=true;
+ const report={viewer:'50.1',three:'0.169.0',protocol:location.protocol,ready:false,events:[]};
+ function log(stage,message,error){
+  const event={at:new Date().toISOString(),stage,message:String(message),stack:error?.stack||null};
+  report.events.push(event);if(report.events.length>100)report.events.shift();
+  document.getElementById('status').textContent=stage+': '+message;
+  if(error)console.error('[Orbital Nexus]',stage,error);
+ }
+ window.orbitalDiagnostics={report,log,ready(){report.ready=true;picker.disabled=false;clearTimeout(timer);log('Ready','Load your approved Revision 32 GLB.');}};
+ const timer=setTimeout(()=>{if(!report.ready)log('Startup failed','Viewer did not initialize. Extract the entire ZIP and use START_VIEWER.cmd; include the vendor folder. Save diagnostics for details.');},15000);
+ window.addEventListener('error',e=>log('Viewer error',e.message||'A script or resource could not load.',e.error));
+ window.addEventListener('unhandledrejection',e=>log('Unexpected error',e.reason?.message||String(e.reason),e.reason));
+ document.getElementById('diagnostics-export').onclick=()=>{
+  const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
+  const a=document.createElement('a');a.href=url;a.download='orbital-diagnostics.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ };
+ if(location.protocol==='file:')log('Local server required','Extract the entire ZIP and run START_VIEWER.cmd. Opening index.html directly cannot reliably load JavaScript modules.');
+ else log('Starting','Loading bundled Three.js and viewer…');
+})();
+</script><script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+const byId=id=>document.getElementById(id);
+const app=document.querySelector('#scene'),status=document.querySelector('#status');const scene=new THREE.Scene();scene.background=new THREE.Color(0x04101c);const camera=new THREE.PerspectiveCamera(49,innerWidth/innerHeight,.1,1000);camera.position.set(0,25,42);const target=new THREE.Vector3(0,-.5,0);camera.lookAt(target);
+const clock=new THREE.Clock();let mixer=null,animationRunning=true,animationCount=0;let renderer;try{renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'})}catch(e){status.textContent='WebGL unavailable: '+e.message;throw e}renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;app.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xaedbff,0x152134,2));const sun=new THREE.DirectionalLight(0xffe2bd,2.5);sun.position.set(25,30,10);scene.add(sun);const fill=new THREE.DirectionalLight(0x50c9ff,1.2);fill.position.set(-20,15,10);scene.add(fill);
+const controls=new OrbitControls(camera,renderer.domElement);controls.target.copy(target);controls.enableDamping=true;controls.dampingFactor=.07;controls.enabled=false;controls.minDistance=7;controls.maxDistance=85;controls.maxPolarAngle=Math.PI*.86;controls.update();let mode='command',model=null,objectURL=null,selection=null;let signalState='idle',signalTime=0,feedTimer=null,lastEventId=null;let runtimeStream=null,blueNetwork=null;const runtimePackets=[];const signalMeshes=[];const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();const statusLabels={chatgpt:'API not configured',github:'API not configured',browser:'Browser module placeholder',netlify:'API not configured',higgsfield:'API not configured',storage:'Storage not configured',render:'Gateway not connected'};
+const modules=[['ChatGPT',-8.3,8,'chatgpt'],['GitHub',8.3,8,'github'],['Browser',-12.5,0,'browser'],['Netlify',12.5,0,'netlify'],['Higgsfield',-8.3,-8,'higgsfield'],['Storage',8.3,-8,'storage'],['Render Hub',0,0,'render']];
+const stationEl=document.querySelector('#stations');const buttons=new Map();for(const [name,x,y,id] of modules){const b=document.createElement('button');b.textContent=name;b.dataset.id=id;b.onclick=()=>select(name,x,y,id);stationEl.append(b);buttons.set(id,b)}
+// Blender XY is exported into Three.js X/-Z; the perimeter has radius 17.
+const RING_RADIUS=17, START_ANGLE=Math.atan2(8,-8.3), END_ANGLE=Math.atan2(8,8.3);
+const SIGNAL_A=new THREE.Vector3(-8.3,.45,-8),SIGNAL_B=new THREE.Vector3(8.3,.45,-8);
+const SIGNAL_RING_A=new THREE.Vector3(RING_RADIUS*Math.cos(START_ANGLE),.45,-RING_RADIUS*Math.sin(START_ANGLE));
+const SIGNAL_RING_B=new THREE.Vector3(RING_RADIUS*Math.cos(END_ANGLE),.45,-RING_RADIUS*Math.sin(END_ANGLE));
+const radialA=SIGNAL_RING_A.clone().sub(SIGNAL_A).normalize(),radialB=SIGNAL_RING_B.clone().sub(SIGNAL_B).normalize();
+const SIGNAL_CONNECT_A=SIGNAL_A.clone().addScaledVector(radialA,2.0),SIGNAL_CONNECT_B=SIGNAL_B.clone().addScaledVector(radialB,2.0);
+const S1=SIGNAL_CONNECT_A.distanceTo(SIGNAL_RING_A),S2=RING_RADIUS*(START_ANGLE-END_ANGLE),S3=SIGNAL_RING_B.distanceTo(SIGNAL_CONNECT_B),STOTAL=S1+S2+S3;
+function routePoint(t,lane=0){let d=Math.max(0,Math.min(1,t))*STOTAL;const offset=(lane-3)*.095;let p;
+ if(d<S1){p=SIGNAL_CONNECT_A.clone().lerp(SIGNAL_RING_A,d/S1);const direction=SIGNAL_RING_A.clone().sub(SIGNAL_CONNECT_A).normalize();p.x+=-direction.z*offset;p.z+=direction.x*offset;}
+ else if(d<S1+S2){const a=START_ANGLE-(d-S1)/RING_RADIUS;const r=RING_RADIUS+offset;p=new THREE.Vector3(r*Math.cos(a),.45,-r*Math.sin(a));}
+ else{p=SIGNAL_RING_B.clone().lerp(SIGNAL_CONNECT_B,(d-S1-S2)/S3);const direction=SIGNAL_CONNECT_B.clone().sub(SIGNAL_RING_B).normalize();p.x+=-direction.z*offset;p.z+=direction.x*offset;}
+ return p;
+}
+// Independent emissive overlay: bright blue perimeter, six short radial links,
+// and dense bridge illumination. This is not dependent on GLB material export.
+function buildBlueNetwork(){
+ if(blueNetwork){scene.remove(blueNetwork);blueNetwork.traverse(o=>{o.geometry?.dispose();o.material?.dispose()})}
+ blueNetwork=new THREE.Group();blueNetwork.name='BLUE_NETWORK_ALWAYS_ON';scene.add(blueNetwork);
+ const blue=new THREE.MeshBasicMaterial({color:0x087aff,toneMapped:false,transparent:true,opacity:.83,depthWrite:false});
+ const whiteBlue=new THREE.MeshBasicMaterial({color:0x73eaff,toneMapped:false,transparent:true,opacity:.94,depthWrite:false});
+ function pipe(points,radius,material){const c=new THREE.CatmullRomCurve3(points);const mesh=new THREE.Mesh(new THREE.TubeGeometry(c,Math.max(12,points.length*2),radius,5,false),material);blueNetwork.add(mesh)}
+ const stations=[[-8.3,8],[8.3,8],[-12.5,0],[12.5,0],[-8.3,-8],[8.3,-8]];
+ for(let lane=0;lane<15;lane++){
+  const radius=17+(lane-7)*.066;
+  const points=[];for(let j=0;j<=192;j++){const a=j/192*Math.PI*2;points.push(new THREE.Vector3(radius*Math.cos(a),.28,-radius*Math.sin(a)))}
+  pipe(points,lane%4===0?.043:.025,lane%4===0?whiteBlue:blue);
+ }
+ for(const [x,y] of stations){
+  const len=Math.hypot(x,y),ux=x/len,uy=y/len,nx=-uy,ny=ux;
+  for(let lane=0;lane<9;lane++){
+   const offset=(lane-4)*.085;
+   pipe([new THREE.Vector3(x+ux*2+nx*offset,.29,-(y+uy*2+ny*offset)),new THREE.Vector3(ux*17+nx*offset,.29,-(uy*17+ny*offset))],.027,lane===4?whiteBlue:blue);
+  }
+ }
+ const bridges=[...stations.map(([x,y])=>[[0,0],[x,y]]),[[0,-1.5],[0,-20]]];
+ for(const [start,end] of bridges){
+  const dx=end[0]-start[0],dy=end[1]-start[1],len=Math.hypot(dx,dy),nx=-dy/len,ny=dx/len;
+  for(let lane=0;lane<11;lane++){
+   const off=(lane-5)*.12;
+   pipe([new THREE.Vector3(start[0]+nx*off,.32,-(start[1]+ny*off)),new THREE.Vector3(end[0]+nx*off,.32,-(end[1]+ny*off))],.023,lane%4===0?whiteBlue:blue);
+  }
+ }
+}
+const ROUTE_STATIONS={ChatGPT:[-8.3,8],GitHub:[8.3,8],Browser:[-12.5,0],Netlify:[12.5,0],Higgsfield:[-8.3,-8],Storage:[8.3,-8],Render:[0,0]};
+let currentRoute=['ChatGPT','GitHub'],activeRoutePoint=routePoint;
+function makePerimeterRoute(from,to){
+ const a=ROUTE_STATIONS[from],b=ROUTE_STATIONS[to];
+ if(!a||!b||from===to||from==='Render'||to==='Render')return null;
+ const angleA=Math.atan2(a[1],a[0]),angleB=Math.atan2(b[1],b[0]);
+ // Signed shortest perimeter arc, with no crossing through the hub.
+ let delta=Math.atan2(Math.sin(angleB-angleA),Math.cos(angleB-angleA));
+ // The exact opposite-station case takes the upper half consistently.
+ if(Math.abs(Math.abs(delta)-Math.PI)<1e-8)delta=-Math.PI;
+ const radius=RING_RADIUS,ra=Math.hypot(a[0],a[1]),rb=Math.hypot(b[0],b[1]);
+ const startR=Math.min(radius,ra+2),endR=Math.min(radius,rb+2);
+ const first=radius-startR,arc=radius*Math.abs(delta),last=radius-endR,total=first+arc+last;
+ return (t,lane=0)=>{
+  const d=Math.max(0,Math.min(1,t))*total;
+  const offset=(lane-3)*.095;
+  let theta,r;
+  if(d<=first){theta=angleA;r=startR+d}
+  else if(d<=first+arc){theta=angleA+delta*((d-first)/arc);r=radius}
+  else{theta=angleB;r=radius-(d-first-arc)}
+  // Concentric lanes on the perimeter; parallel radial lanes on connectors.
+  return new THREE.Vector3((r+offset)*Math.cos(theta),.45,-(r+offset)*Math.sin(theta));
+ };
+}
+function buildRuntimeStream(from='ChatGPT',to='GitHub'){
+ if(runtimeStream){runtimeStream.visible=false;scene.remove(runtimeStream);(()=>{const geometries=new Set(),materials=new Set();runtimeStream.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>materials.add(m))});geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose())})()}
+ runtimeStream=new THREE.Group();runtimeStream.name='RUNTIME_RED_OUTER_RING';scene.add(runtimeStream);runtimePackets.length=0;
+ currentRoute=[from,to];
+ activeRoutePoint=from==='ChatGPT'&&to==='GitHub'?routePoint:makePerimeterRoute(from,to);
+ if(!activeRoutePoint){runtimeStream.visible=false;status.textContent='No perimeter route available for '+from+' → '+to;return false}
+ const redMat=new THREE.MeshBasicMaterial({color:0xff2138,toneMapped:false,transparent:true,opacity:.85,depthWrite:false});
+ for(let lane=0;lane<7;lane++){
+  const samples=150,positions=[];for(let j=0;j<=samples;j++)positions.push(activeRoutePoint(j/samples,lane));
+  const path=new THREE.CurvePath();for(let k=0;k<positions.length-1;k++)path.add(new THREE.LineCurve3(positions[k],positions[k+1]));
+  runtimeStream.add(new THREE.Mesh(new THREE.TubeGeometry(path,samples*2,.037,5,false),redMat));
+ }
+ const orbGeo=new THREE.SphereGeometry(.095,8,6),orbMat=new THREE.MeshBasicMaterial({color:0xffd9df,toneMapped:false,depthWrite:false});
+ for(let lane=0;lane<7;lane++)for(let i=0;i<24;i++){const orb=new THREE.Mesh(orbGeo,orbMat);orb.userData={lane,i};runtimeStream.add(orb);runtimePackets.push(orb)}
+ runtimeStream.visible=signalState==='running';return true;
+}
+function updateRuntimeStream(dt){if(!runtimeStream||!runtimeStream.visible||!activeRoutePoint)return;signalTime+=dt;
+ for(const orb of runtimePackets){const {lane,i}=orb.userData;orb.position.copy(activeRoutePoint((i/24+signalTime*1.15+lane*.017)%1,lane));}
+}
+function configureSignals(){buildBlueNetwork();buildRuntimeStream();signalMeshes.length=0;if(!model)return;
+ model.traverse(o=>{const redName=/^V(27_EVENT|28_EVENT_RED|29_RED_RING)/.test(o.name);const redMaterial=o.isMesh&&[o.material].flat().some(m=>/V(27_event_red|28_stream_red|29_outer_ring_red)/i.test(m?.name||''));if(redName||redMaterial){o.visible=false;signalMeshes.push(o)}});
+ updateSignalAppearance();}
+function updateSignalAppearance(){const active=signalState==='running';
+ if(runtimeStream)runtimeStream.visible=active;
+ for(const o of signalMeshes)o.visible=false;
+ // The always-blue spokes, central hub, perimeter and walkways are never disabled.
+ document.querySelector('#agent-response').textContent=active?'TASK RUNNING · '+currentRoute[0].toUpperCase()+' → OUTER RING → '+currentRoute[1].toUpperCase()+' · RED PARTICLES MOVING':'NETWORK IDLE · ALL PATHWAYS, HUB & OUTER RING BLUE';
+ document.querySelector('#demo').classList.toggle('active',active);
+ document.querySelector('#complete').disabled=!active;
+}
+function setSignalState(next,source='demo'){if(!['idle','running'].includes(next))return;signalState=next;signalTime=0;updateSignalAppearance();status.textContent=(next==='running'?'Red stream active: '+currentRoute[0]+' → outer ring → '+currentRoute[1]:'Task complete: network restored to blue')+' · '+source}
+// V59: backend-driven 3D markers and route overlay. This group is independent of the GLB.
+// It does not mutate imported geometry, camera, manual demo routes or connector permissions.
+const backendVisuals=new THREE.Group();backendVisuals.name='V59_BACKEND_SIMULATION_OVERLAY';scene.add(backendVisuals);
+const backendMarkerGeo=new THREE.TorusGeometry(.88,.095,8,48);
+const backendSourceMat=new THREE.MeshBasicMaterial({color:0xffa448,depthTest:false,transparent:true,opacity:.95,toneMapped:false});
+const backendTargetMat=new THREE.MeshBasicMaterial({color:0xff415e,depthTest:false,transparent:true,opacity:.95,toneMapped:false});
+const backendMarkers=new Map();
+for(const [name,xy] of Object.entries(ROUTE_STATIONS)){
+ const marker=new THREE.Mesh(backendMarkerGeo,name==='Render'?backendTargetMat:backendSourceMat);
+ marker.rotation.x=-Math.PI/2;marker.position.set(xy[0],1.25,-xy[1]);marker.visible=false;marker.renderOrder=50;
+ backendVisuals.add(marker);backendMarkers.set(name,marker);
+}
+let backendRouteMesh=null,backendLastEvent=null;
+function clearBackendVisuals(){
+ for(const marker of backendMarkers.values())marker.visible=false;
+ if(backendRouteMesh){backendVisuals.remove(backendRouteMesh);backendRouteMesh.geometry.dispose();backendRouteMesh.material.dispose();backendRouteMesh=null;}
+}
+function updateBackendVisuals(payload){
+ backendLastEvent=payload;
+ clearBackendVisuals();
+ const step=payload?.step;
+ if(!payload?.simulation||payload.state!=='running'||!step)return;
+ const source=backendMarkers.get(step.from),dest=backendMarkers.get(step.to);
+ if(source)source.visible=true;
+ if(dest){dest.visible=true;dest.material=backendTargetMat;}
+ if(!source||!dest||step.from===step.to)return; // Unknown logical nodes have no physical route.
+ const route=makePerimeterRoute(step.from,step.to);
+ if(!route)return; // Hub connections have no validated perimeter route.
+ const pts=Array.from({length:121},(_,i)=>route(i/120));
+ backendRouteMesh=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),180,.065,6,false),new THREE.MeshBasicMaterial({color:0xff3855,toneMapped:false,transparent:true,opacity:.85,depthWrite:false}));
+ backendRouteMesh.name='V59_BACKEND_SIMULATED_PERIMETER';backendVisuals.add(backendRouteMesh);
+}
+document.addEventListener('orbital:backend-simulation',event=>updateBackendVisuals(event.detail));
+window.addEventListener('pagehide',()=>{clearBackendVisuals();backendMarkerGeo.dispose();backendSourceMat.dispose();backendTargetMat.dispose()},{once:true});
+// Local control lab. Does not invoke external services; demo animation is unchanged.
+const storeKey='orbital-nexus-v7-registry-v1';
+const roleDescriptions={chatgpt:'AI task orchestration and reasoning',github:'Source control and workflow execution',browser:'Web interaction and research',netlify:'Deployment and hosting',higgsfield:'3D and creative generation',storage:'Artifacts and persistent data',render:'Event gateway and service routing'};
+let registry=[];try{const raw=JSON.parse(localStorage.getItem(storeKey)||'[]');if(Array.isArray(raw))registry=raw.filter(v=>v&&typeof v.name==='string'&&typeof v.kind==='string').slice(0,80)}catch(e){}
+// Custom logical stations are not added to the fixed GLB geometry.
+const physicalNames=new Set(['ChatGPT','GitHub','Browser','Netlify','Higgsfield','Storage','Render']);
+function normalizeRegistry(input){
+ const seen=new Set();
+ return input.filter(v=>v&&typeof v.name==='string'&&typeof v.kind==='string')
+  .slice(0,80).map(v=>({name:v.name.trim().slice(0,50),kind:v.kind.trim().slice(0,30)}))
+  .filter(v=>v.name&&v.kind&&![...physicalNames].some(n=>n.toLowerCase()===v.name.toLowerCase())&&!seen.has(v.name.toLowerCase())&&seen.add(v.name.toLowerCase()));
+}
+registry=normalizeRegistry(registry);
+const logicalLayer=byId('logical-node-layer');
+const logicalVisibility=byId('show-logical-nodes');
+try{logicalVisibility.checked=localStorage.getItem('orbital.logical.nodes')!=='false'}catch(_){}
+logicalVisibility.addEventListener('change',()=>{
+ try{localStorage.setItem('orbital.logical.nodes',String(logicalVisibility.checked))}catch(_){}
+ syncLogicalMarkers();
+ updateLogicalRouteIndicators();
+});
+function selectLogicalStation(c){
+ actionStation={name:c.name,id:'virtual',routeName:c.name};
+ byId('sap-name').textContent=c.name;
+ byId('sap-role').textContent=c.kind+' · logical station';
+ byId('sap-connection').textContent='Offline · no physical GLB node';
+ byId('sap-feedback').textContent='';
+ byId('sap-source').disabled=workflowIndex>=0;
+ byId('sap-destination').disabled=workflowIndex>=0;
+ refreshStationRoute();
+ byId('station-action-panel').dataset.open='true';
+ byId('selected').textContent=c.name;
+ byId('details').textContent='Custom logical station: marker is a projected UI overlay, not part of the approved GLB.';
+ byId('connection').textContent='Connection: Offline · not configured';
+ byId('station-inspector').textContent=c.name+' · '+c.kind+' · logical station · offline';
+ addHistory('station.selected',c.name+' (logical)');
+ for(const b of logicalLayer.children)b.dataset.selected=String(b.dataset.station===c.name);
+}
+function syncLogicalMarkers(){
+ logicalLayer.replaceChildren();
+ if(!logicalVisibility.checked)return;
+ for(const c of registry.slice(0,12)){
+  const b=document.createElement('button');b.type='button';b.className='logical-node';
+  b.textContent='◇ '+c.name;b.title=c.name+' · '+c.kind+' · virtual / offline';
+  b.dataset.station=c.name;b.onclick=()=>selectLogicalStation(c);
+  logicalLayer.append(b);
+ }
+}
+function updateLogicalRouteIndicators(){
+ const caption=byId('logical-route-caption');
+ const step=workflowIndex>=0?workflow[workflowIndex]:null;
+ const isLogical=!!step&&(!physicalNames.has(step.from)||!physicalNames.has(step.to));
+ caption.hidden=!isLogical;
+ if(isLogical)caption.textContent='◇ LOGICAL ROUTE · '+step.from+' → '+step.to+(workflowFailed?' · FAILED':' · SIMULATED · no physical signal path');
+ for(const node of logicalLayer.children){
+  node.dataset.route=isLogical&&node.dataset.station===step.from?'source':isLogical&&node.dataset.station===step.to?'destination':'';
+  node.setAttribute('aria-label',node.dataset.station+(node.dataset.route?' · active '+node.dataset.route:'')+' · logical station');
+ }
+}
+function positionLogicalMarkers(){
+ updateLogicalRouteIndicators();
+ if(!logicalVisibility.checked||!logicalLayer.children.length)return;
+ const bounds=renderer.domElement.getBoundingClientRect();
+ for(const [i,node] of [...logicalLayer.children].entries()){
+  const angle=(i/Math.max(1,logicalLayer.children.length))*Math.PI*2-Math.PI/2;
+  const p=new THREE.Vector3(21.2*Math.cos(angle),2.2,-21.2*Math.sin(angle)).project(camera);
+  const inside=p.z>=-1&&p.z<=1&&p.x>=-0.95&&p.x<=0.95&&p.y>=-0.92&&p.y<=0.92;
+  node.hidden=!inside;
+  if(inside){node.style.left=(bounds.left+(p.x+1)*bounds.width/2)+'px';node.style.top=(bounds.top+(1-p.y)*bounds.height/2)+'px'}
+ }
+}
+function syncLogicalStations(){
+ const custom=byId('virtual-stations');custom.replaceChildren();
+ const source=byId('workflow-from'),dest=byId('workflow-to');
+ for(const field of [source,dest]){
+  const previous=field.value;
+  field.querySelectorAll('option[data-custom="true"]').forEach(o=>o.remove());
+  for(const c of registry){const opt=document.createElement('option');opt.textContent=c.name;opt.value=c.name;opt.dataset.custom='true';field.append(opt)}
+  if([...field.options].some(o=>o.value===previous))field.value=previous;
+ }
+ for(const c of registry){
+  const button=document.createElement('button');button.type='button';button.textContent=c.name+' · '+c.kind;
+  button.title='Logical station (no 3D geometry or authenticated connection)';
+  button.onclick=()=>selectLogicalStation(c);
+  custom.append(button);
+ }
+ if(!registry.length)custom.textContent='No custom logical stations.';
+ syncLogicalMarkers();
+}
+const history=[];let localTask=null;let taskTimer=null;
+const queue=[];let missionCounter=0;
+const queueStoreKey='orbital-nexus-v7-mission-queue-v1';
+try{const saved=JSON.parse(localStorage.getItem(queueStoreKey)||'[]');if(Array.isArray(saved))queue.push(...saved.filter(x=>x&&typeof x.name==='string').slice(0,25).map(x=>({name:x.name.slice(0,90)})))}catch(e){}
+function persistQueue(){try{localStorage.setItem(queueStoreKey,JSON.stringify(queue))}catch(e){status.textContent='Queue storage unavailable: '+e.message}}
+function enqueueMission(name){name=String(name||'').trim().slice(0,90);if(!name)return false;if(queue.length>=25){status.textContent='Mission queue limit: 25';return false}queue.push({name});persistQueue();addHistory('mission.queued',name);renderQueue();return true}
+function renderQueue(){const el=document.getElementById('mission-queue');if(!el)return;el.replaceChildren();if(localTask){const d=document.createElement('div');d.className='record';d.textContent='ACTIVE · '+localTask.name+' · '+localTask.progress+'%';el.append(d)}queue.forEach((q,i)=>{const d=document.createElement('div');d.className='record';const title=document.createElement('span');title.textContent=(i+1)+'. '+q.name+' · waiting';d.append(title);for(const [label,offset] of [['↑',-1],['↓',1]]){const b=document.createElement('button');b.textContent=label;b.title=offset<0?'Move earlier':'Move later';b.disabled=i+offset<0||i+offset>=queue.length;b.onclick=()=>{const j=i+offset;[queue[i],queue[j]]=[queue[j],queue[i]];persistQueue();renderQueue()};d.append(b)}const remove=document.createElement('button');remove.textContent='×';remove.title='Remove mission';remove.onclick=()=>{queue.splice(i,1);persistQueue();renderQueue()};d.append(remove);el.append(d)});if(!localTask&&!queue.length)el.textContent='Queue empty.'}
+function startMission(name){if(localTask||workflowIndex>=0)return false;buildRuntimeStream('ChatGPT','GitHub');localTask={name,state:'running',progress:0};setSignalState('running','mission simulation');addHistory('mission.started',name);renderTask();taskTimer=setInterval(()=>{if(!localTask)return;localTask.progress=Math.min(95,localTask.progress+5);renderTask();if(localTask.progress>=95){clearInterval(taskTimer);taskTimer=null}},850);return true}
+function exportJSON(filename,data){const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)}
+
+const auditKey='orbital-nexus-v48-audit';
+const checkpointKey='orbital-nexus-v48-checkpoint';
+let audit=[];
+try{const raw=JSON.parse(localStorage.getItem(auditKey)||'[]');if(Array.isArray(raw))audit=raw.filter(x=>x&&typeof x.type==='string'&&typeof x.at==='string').slice(-200)}catch(e){}
+function auditEvent(type){
+ // Store only a fixed event type and timestamp: never copy user payloads, names or tokens.
+ const safe=String(type).replace(/[^a-zA-Z0-9_.-]/g,'').slice(0,60);
+ audit.push({at:new Date().toISOString(),type:safe});audit=audit.slice(-200);
+ try{localStorage.setItem(auditKey,JSON.stringify(audit))}catch(e){byId('audit-status').textContent='Audit storage unavailable';}
+}
+function addHistory(type,detail){auditEvent(type);history.unshift({time:new Date().toLocaleTimeString(),type,detail});if(history.length>100)history.length=100;renderHistory()}
+byId('audit-export').onclick=()=>exportJSON('orbital-nexus-redacted-audit.json',{version:1,local:true,events:audit});
+byId('audit-clear').onclick=()=>{if(!confirm('Clear the local audit history?'))return;audit=[];try{localStorage.removeItem(auditKey)}catch(e){}byId('audit-status').textContent='Local audit cleared.'};
+
+function renderHistory(){byId('event-list').replaceChildren();for(const ev of history){const d=document.createElement('div');d.className='record';d.textContent=ev.time+' · '+ev.type+' · '+ev.detail;byId('event-list').append(d)}if(!history.length)byId('event-list').textContent='No events recorded in this session.'}
+function saveRegistry(){
+ registry=normalizeRegistry(registry);
+ try{localStorage.setItem(storeKey,JSON.stringify(registry))}catch(e){status.textContent='Local storage unavailable: '+e.message}
+ renderRegistry();syncLogicalStations();if(typeof invalidatePreflight==='function')invalidatePreflight();
+}
+function renderRegistry(){
+ const el=byId('connector-list');el.replaceChildren();
+ const query=byId('connector-search').value.trim().toLowerCase();
+ let shown=0;
+ for(const [i,c] of registry.entries()){
+  if(query && !(c.name+' '+c.kind).toLowerCase().includes(query))continue;
+  shown++;
+  const d=document.createElement('div');d.className='record';
+  const t=document.createElement('span');t.textContent=c.name+' · '+c.kind+' · Logical / offline';
+  const edit=document.createElement('button');edit.textContent='Rename';edit.onclick=()=>{
+   if(workflowIndex>=0){status.textContent='Finish the running workflow before renaming';return}
+   const name=prompt('Rename logical station',c.name);
+   if(name===null)return;
+   const candidate=name.trim().slice(0,50);
+   if(!candidate||[...physicalNames].some(n=>n.toLowerCase()===candidate.toLowerCase())||registry.some((r,j)=>j!==i&&r.name.toLowerCase()===candidate.toLowerCase())){status.textContent='Name is blank, reserved or duplicated';return}
+   const old=c.name;c.name=candidate;
+   for(const step of workflow){if(step.from===old)step.from=candidate;if(step.to===old)step.to=candidate}
+   persistWorkflow();saveRegistry();renderWorkflow();addHistory('station.renamed',old+' → '+candidate);
+  };
+  const b=document.createElement('button');b.textContent='Remove';b.style.marginLeft='6px';b.onclick=()=>{
+   if(workflowIndex>=0){status.textContent='Finish the running workflow before removing stations';return}
+   if(workflow.some(step=>step.from===c.name||step.to===c.name)){status.textContent='Station is used in a workflow; remove its steps first';return}
+   registry.splice(i,1);saveRegistry();addHistory('station.removed',c.name);
+  };
+  d.append(t,edit,b);el.append(d);
+ }
+ byId('connector-count').textContent=shown+' of '+registry.length+' custom stations';
+ if(!shown)el.textContent=query?'No matching stations.':'No custom logical stations.';
+}
+byId('connector-search').addEventListener('input',renderRegistry);
+byId('connector-add').onclick=()=>{
+ if(workflowIndex>=0){status.textContent='Cannot edit stations during a workflow';return}
+ const name=byId('connector-name').value.trim().slice(0,50);
+ if(!name)return;
+ if(registry.length>=80){status.textContent='Maximum 80 local connectors';return}
+ if([...physicalNames].some(n=>n.toLowerCase()===name.toLowerCase())||registry.some(c=>c.name.toLowerCase()===name.toLowerCase())){status.textContent='Station name already exists';return}
+ registry.push({name,kind:byId('connector-kind').value});
+ byId('connector-name').value='';saveRegistry();addHistory('station.registered',name+' (logical, offline)');
+};
+byId('connector-export').onclick=()=>exportJSON('orbital-nexus-connectors.json',{version:1,connectors:registry});
+byId('connector-import').onclick=()=>byId('connector-file').click();byId('connector-file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{if(f.size>100000)throw Error('File too large');const j=JSON.parse(await f.text());if(!Array.isArray(j.connectors))throw Error('Invalid registry');if(workflowIndex>=0)throw Error('Cannot import while workflow is running');
+if(j.connectors.length>80)throw Error('Registry exceeds 80 stations');
+const incoming=normalizeRegistry(j.connectors);
+if(incoming.length!==j.connectors.length)throw Error('Registry contains duplicate, reserved, blank, or invalid station names');
+const missing=workflow.filter(step=>[step.from,step.to].some(name=>!physicalNames.has(name)&&!incoming.some(c=>c.name===name)));
+if(missing.length)throw Error('Imported registry would orphan workflow steps');
+registry=incoming;saveRegistry();addHistory('connector.imported',registry.length+' placeholders')}catch(err){status.textContent='Import failed: '+err.message}e.target.value=''};
+function renderTask(){byId('task-progress').style.width=(localTask?.progress||0)+'%';byId('task-label').textContent=localTask?localTask.name+' · '+localTask.state+' · '+localTask.progress+'%':'No task running';renderQueue()}
+function endLocalTask(state){if(taskTimer){clearInterval(taskTimer);taskTimer=null}if(!localTask)return;localTask.state=state;localTask.progress=state==='completed'?100:localTask.progress;renderTask();addHistory('task.'+state,localTask.name);setSignalState('idle','local task console');localTask=null;renderTask()}
+byId('task-start').onclick=()=>{if(localTask){status.textContent='Complete or cancel the active task first';return}startMission(byId('task-name').value.trim()||'GPT → GitHub demo')};
+byId('mission-add').onclick=()=>{const name=byId('mission-name').value.trim()||'Mission '+(++missionCounter);if(enqueueMission(name))byId('mission-name').value=''};
+byId('mission-next').onclick=()=>{if(localTask||workflowIndex>=0){status.textContent='Finish the current mission before starting the next';return}if(!queue.length){status.textContent='Mission queue is empty';return}const next=queue.shift();persistQueue();if(!next){status.textContent='Mission queue is empty';return}startMission(next.name)};
+byId('mission-cancel').onclick=()=>endLocalTask('cancelled');
+for(const [id,title] of [['mission-template-code','Review GitHub pull request'],['mission-template-deploy','Validate Netlify deployment preview'],['mission-template-audit','Audit Truck Scanner OCR benchmark']])byId(id).onclick=()=>enqueueMission(title);
+byId('mission-save').onclick=()=>exportJSON('orbital-nexus-mission-plan.json',{version:1,mode:'local-demo',missions:queue});
+byId('mission-load').onclick=()=>byId('mission-file').click();
+byId('mission-file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{if(f.size>100000)throw Error('Plan exceeds 100 KB');const data=JSON.parse(await f.text());if(!Array.isArray(data.missions))throw Error('Invalid mission plan');const incoming=data.missions.filter(x=>x&&typeof x.name==='string').slice(0,25).map(x=>({name:x.name.trim().slice(0,90)})).filter(x=>x.name);queue.splice(0,queue.length,...incoming);persistQueue();renderQueue();addHistory('mission.plan.imported',incoming.length+' queued missions')}catch(err){status.textContent='Plan import failed: '+err.message}e.target.value=''};
+byId('mission-clear').onclick=()=>{queue.length=0;persistQueue();renderQueue();addHistory('mission.queue.cleared','Waiting missions removed')};
+// V8: locally simulated multi-station workflow builder. No live API calls.
+const workflowKey='orbital-nexus-v8-workflow';
+let workflow=[], workflowIndex=-1,workflowFailed=false,workflowRunLog=[],workflowRunStarted=null;
+try{const saved=JSON.parse(localStorage.getItem(workflowKey)||'[]');if(Array.isArray(saved))workflow=saved.filter(s=>s&&typeof s.from==='string'&&typeof s.to==='string'&&typeof s.action==='string').slice(0,20).map(s=>({from:s.from.slice(0,30),to:s.to.slice(0,30),action:s.action.slice(0,90)}))}catch(e){}
+syncLogicalStations();renderRegistry();
+const validStationName=name=>physicalNames.has(name)||registry.some(c=>c.name===name);
+const invalidSavedSteps=workflow.filter(step=>!validStationName(step.from)||!validStationName(step.to));
+if(invalidSavedSteps.length){
+ status.textContent='Warning: '+invalidSavedSteps.length+' saved workflow step(s) reference unavailable stations. Review before running.';
+}
+function persistWorkflow(){invalidatePreflight();try{localStorage.setItem(workflowKey,JSON.stringify(workflow))}catch(e){}}
+function checkpointSave(){
+ const data={version:1,at:new Date().toISOString(),steps:workflow.map(x=>({from:x.from,to:x.to,action:x.action}))};
+ try{localStorage.setItem(checkpointKey,JSON.stringify(data));byId('checkpoint-status').textContent='Checkpoint saved at '+new Date(data.at).toLocaleString();addHistory('checkpoint.saved','Workflow draft only')}
+ catch(e){byId('checkpoint-status').textContent='Checkpoint storage failed';}
+}
+byId('checkpoint-save').onclick=checkpointSave;
+byId('checkpoint-restore').onclick=()=>{
+ if(workflowIndex>=0||localTask){byId('checkpoint-status').textContent='Stop active simulations before restoring.';return}
+ let data;try{data=JSON.parse(localStorage.getItem(checkpointKey)||'null')}catch(e){}
+ if(!data||data.version!==1||!Array.isArray(data.steps)||data.steps.length>20||!data.steps.every(x=>x&&typeof x.from==='string'&&typeof x.to==='string'&&typeof x.action==='string'&&x.from.length<=50&&x.to.length<=50&&x.action.length<=90&&validStationName(x.from)&&validStationName(x.to))){byId('checkpoint-status').textContent='No valid checkpoint, or a referenced station is unavailable.';return}
+ if(!confirm('Replace the current workflow draft with this checkpoint? No execution will resume.'))return;
+ workflow=data.steps.map(x=>({from:x.from,to:x.to,action:x.action}));workflowIndex=-1;workflowFailed=false;
+ persistWorkflow();renderWorkflow();byId('checkpoint-status').textContent='Draft restored. Execution remains stopped.';addHistory('checkpoint.restored','Draft only; not executed');
+};
+function workflowRoute(step){return !!makePerimeterRoute(step.from,step.to)}
+let latestPreflight=null;
+function invalidatePreflight(){
+ latestPreflight=null;
+ byId('workflow-preflight-export').disabled=true;
+ byId('workflow-preflight-result').textContent='Workflow or registry changed. Run Check Workflow again.';
+}
+function checkWorkflow(){
+ const issues=[];
+ const routes=[];
+ if(!workflow.length)issues.push('No steps configured');
+ if(workflow.length>20)issues.push('Workflow exceeds 20-step limit');
+ for(const [i,step] of workflow.entries()){
+  const names=[step.from,step.to];
+  if(names.some(name=>!validStationName(name)))issues.push('Step '+(i+1)+': unregistered station');
+  if(step.from===step.to)issues.push('Step '+(i+1)+': source and destination are identical');
+  if(!step.action.trim())issues.push('Step '+(i+1)+': empty action');
+  const physical=workflowRoute(step);
+  routes.push({step:i+1,from:step.from,to:step.to,mode:physical?'physical-red-signal':'logical-no-physical-signal'});
+ }
+ const report={schema:1,simulation:true,checkedAt:new Date().toISOString(),ready:issues.length===0,stepCount:workflow.length,physicalRoutes:routes.filter(r=>r.mode==='physical-red-signal').length,logicalRoutes:routes.filter(r=>r.mode!=='physical-red-signal').length,issues,routes};
+ latestPreflight=report;
+ const el=byId('workflow-preflight-result');el.replaceChildren();
+ const summary=document.createElement('strong');summary.textContent=report.ready?'✓ Ready for local simulation':'⚠ Workflow needs attention';el.append(summary);
+ const details=document.createElement('div');details.textContent=`${report.stepCount} steps · ${report.physicalRoutes} physical signal routes · ${report.logicalRoutes} logical-only routes`;el.append(details);
+ for(const issue of issues){const line=document.createElement('div');line.textContent='• '+issue;el.append(line)}
+ byId('workflow-preflight-export').disabled=false;
+ return report;
+}
+byId('workflow-preflight').onclick=()=>checkWorkflow();
+byId('workflow-preflight-export').onclick=()=>{if(latestPreflight)exportJSON('orbital-workflow-preflight.json',latestPreflight)};
+function renderWorkflow(){
+ updateLogicalRouteIndicators();
+ const el=byId('workflow-steps');el.replaceChildren();
+ workflow.forEach((step,i)=>{const d=document.createElement('div');d.className='record';
+ const label=document.createElement('span');label.textContent=(i+1)+'. '+step.from+' → '+step.to+' · '+step.action+(i===workflowIndex?(workflowFailed?' · FAILED':' · ACTIVE'):i<workflowIndex?' · COMPLETE':' · WAITING');d.append(label);
+ const move=(label,dir)=>{const b=document.createElement('button');b.textContent=label;b.title=dir<0?'Move up':'Move down';b.disabled=workflowIndex>=0||i+dir<0||i+dir>=workflow.length;b.onclick=()=>{[workflow[i],workflow[i+dir]]=[workflow[i+dir],workflow[i]];persistWorkflow();renderWorkflow()};d.append(b)};
+ move('↑',-1);move('↓',1);
+ const edit=document.createElement('button');edit.textContent='Edit';edit.disabled=workflowIndex>=0;edit.onclick=()=>{if(workflowIndex>=0)return;const step=workflow[i];byId('workflow-from').value=step.from;byId('workflow-to').value=step.to;byId('workflow-action').value=step.action;workflow.splice(i,1);persistWorkflow();renderWorkflow();byId('workflow-status').textContent='Step loaded into editor. Change values and select Add Step.'};d.append(edit);
+ const b=document.createElement('button');b.textContent='×';b.title='Remove step';b.disabled=workflowIndex>=0;b.onclick=()=>{workflow.splice(i,1);persistWorkflow();renderWorkflow()};d.append(b);el.append(d)});
+ if(!workflow.length)el.textContent='No steps configured.';
+ byId('workflow-run').disabled=workflowIndex>=0||!workflow.length||!!localTask;
+ byId('workflow-next').disabled=workflowIndex<0||workflowFailed;
+ byId('workflow-fail').disabled=workflowIndex<0||workflowFailed;
+ byId('workflow-retry').disabled=workflowIndex<0||!workflowFailed;
+ byId('workflow-progress').style.width=(workflow.length?Math.round(Math.max(0,workflowIndex)/workflow.length*100):0)+'%';
+ byId('workflow-run-status').textContent=workflowIndex<0?'No workflow running.':(workflowFailed?'Step failed · Retry Step or Stop':'Running step '+(workflowIndex+1)+' of '+workflow.length);
+ byId('workflow-stop').disabled=workflowIndex<0;
+ if(workflowIndex<0)byId('workflow-stop-confirm').dataset.open='false';
+ byId('workflow-add-step').disabled=workflowIndex>=0;
+ for(const id of Object.keys(workflowPresets))byId(id).disabled=workflowIndex>=0||workflow.length+3>20;
+ byId('workflow-status').textContent=workflowIndex<0?'Local simulation only · no external service calls.':'Step '+(workflowIndex+1)+'/'+workflow.length+' · '+workflow[workflowIndex].action+' · '+(workflowRoute(workflow[workflowIndex])?'Red route: '+workflow[workflowIndex].from+' → '+workflow[workflowIndex].to:'No physical red route: this step uses a logical station or the Render hub');
+}
+function activateWorkflowStep(){
+ const step=workflow[workflowIndex];
+ if(!step){workflowIndex=-1;workflowFailed=false;setSignalState('idle','workflow finished');renderWorkflow();return}
+ workflowFailed=false;
+ if(workflowRoute(step)){buildRuntimeStream(step.from,step.to);setSignalState('running','workflow simulation')}else{currentRoute=[step.from,step.to];setSignalState('idle','workflow step without physical route');}
+ workflowRunLog.push({event:'step.started',index:workflowIndex,from:step.from,to:step.to,action:step.action,at:new Date().toISOString()});
+ addHistory('workflow.step.started',step.from+' → '+step.to+' · '+step.action);
+ renderWorkflow();
+}
+byId('workflow-add-step').onclick=()=>{
+ if(workflowIndex>=0||workflow.length>=20)return;
+ const from=byId('workflow-from').value,to=byId('workflow-to').value;
+ if(from===to){status.textContent='Select two different stations';return}
+ if(!validStationName(from)||!validStationName(to)){status.textContent='Choose registered stations';return}
+ const action=byId('workflow-action').value.trim().slice(0,90)||'Transfer task';
+ workflow.push({from,to,action});byId('workflow-action').value='';persistWorkflow();renderWorkflow();addHistory('workflow.step.added',from+' → '+to);
+};
+const workflowPresets={
+ 'workflow-preset-dev':[['ChatGPT','GitHub','Review code'],['GitHub','Netlify','Prepare deployment'],['Netlify','Storage','Archive build']],
+ 'workflow-preset-media':[['Browser','Higgsfield','Collect visual references'],['Higgsfield','Storage','Save generated assets'],['Storage','Netlify','Publish preview']],
+ 'workflow-preset-data':[['Browser','Storage','Collect documents'],['Storage','ChatGPT','Analyze document batch'],['ChatGPT','GitHub','Review parser changes']]
+};
+for(const [id,steps] of Object.entries(workflowPresets))byId(id).onclick=()=>{
+ if(workflowIndex>=0)return;
+ if(workflow.length+steps.length>20){byId('workflow-status').textContent='Maximum 20 workflow steps';return}
+ for(const [from,to,action] of steps)workflow.push({from,to,action});
+ persistWorkflow();renderWorkflow();addHistory('workflow.preset.added',id);
+};
+// Critical safeguards: session-only simulation permission, explicit approval, emergency lock.
+let securityLocked=false;
+let securityApprovalPending=false;
+const simulationToggle=byId('security-simulation');
+const approvalToggle=byId('security-approve');
+const securityState=byId('security-state');
+const approvalPanel=byId('security-approval');
+function securityRender(){
+ securityState.textContent=securityLocked?'EMERGENCY LOCK ACTIVE · no new simulation allowed':simulationToggle.checked?'Local simulation permitted · external execution still disabled':'DEFAULT DENY · local simulation not permitted';
+ byId('security-reset').disabled=!securityLocked;
+ if(securityLocked){simulationToggle.checked=false;approvalPanel.hidden=true;securityApprovalPending=false;}
+}
+let simulatedStepsConsumed=0;
+function budgetValue(id,min,max){const v=Number(byId(id).value);return Number.isSafeInteger(v)&&v>=min&&v<=max?v:null}
+function checkSimulationBudget(){
+ const per=budgetValue('sim-budget-steps',1,50), total=budgetValue('sim-budget-total',1,500);
+ const needed=workflow.length;
+ const ok=per!==null&&total!==null&&needed<=per&&simulatedStepsConsumed+needed<=total;
+ byId('sim-budget-state').textContent='Simulation steps reserved: '+simulatedStepsConsumed+' / '+(total??'invalid')+' · proposed '+needed+' · '+(ok?'within limits':'LIMIT EXCEEDED');
+ if(!ok){status.textContent='Simulation budget exceeded or invalid. Reduce workflow steps or adjust limits.';addHistory('security.budget.blocked','Local step budget denied');}
+ return ok;
+}
+function securityStart(){
+ if(securityLocked||!simulationToggle.checked){addHistory('security.blocked','Simulation denied by local policy');securityRender();return;}
+ const preflight=checkWorkflow();
+ if(!preflight.ready){byId('workflow-status').textContent='Cannot run: correct workflow check issues first.';return;}
+ if(!checkSimulationBudget())return;
+ if(approvalToggle.checked){
+  securityApprovalPending=true;
+  byId('security-approval-summary').textContent='Approve LOCAL simulation of '+workflow.length+' steps? No external commands will be sent.';
+  approvalPanel.hidden=false;
+  addHistory('security.approval.requested','Local workflow simulation');
+  return;
+ }
+ securityBegin();
+}
+// Local simulation budgets; backend independently enforces its own request limit.
+const SIM_RUN_LIMIT=10, SIM_WINDOW_MS=60000, SIM_RETRY_LIMIT=3;
+const simulationRuns=[];
+const simulationRetries=new Map();
+function permitSimulationStart(){
+ const now=Date.now();while(simulationRuns.length&&simulationRuns[0]<=now-SIM_WINDOW_MS)simulationRuns.shift();
+ if(simulationRuns.length>=SIM_RUN_LIMIT){
+  const wait=Math.ceil((SIM_WINDOW_MS-(now-simulationRuns[0]))/1000);
+  status.textContent='Rate limit: maximum '+SIM_RUN_LIMIT+' simulated workflows per minute. Retry in '+wait+'s.';
+  addHistory('security.rate_limited','Workflow start blocked · '+wait+'s');return false;
+ }
+ simulationRuns.push(now);return true;
+}
+function securityBegin(){
+ if(securityLocked||!simulationToggle.checked||workflowIndex>=0||localTask)return;
+ const check=checkWorkflow();if(!check.ready)return;
+ if(!checkSimulationBudget())return;
+ if(!permitSimulationStart())return;
+ simulatedStepsConsumed+=workflow.length;checkSimulationBudget();
+ simulationRetries.clear();
+ securityApprovalPending=false;approvalPanel.hidden=true;
+ workflowIndex=0;workflowFailed=false;workflowRunStarted=new Date().toISOString();workflowRunLog=[];
+ addHistory('workflow.started',byId('workflow-name').value.trim()||'Untitled workflow');activateWorkflowStep();
+}
+byId('security-yes').onclick=()=>{if(securityApprovalPending){addHistory('security.approval.granted','Local simulation');securityBegin()}};
+byId('security-no').onclick=()=>{securityApprovalPending=false;approvalPanel.hidden=true;addHistory('security.approval.denied','Local simulation')};
+simulationToggle.onchange=()=>{if(securityLocked)simulationToggle.checked=false;securityRender()};
+byId('security-stop').onclick=()=>{
+ securityLocked=true;simulationToggle.checked=false;securityApprovalPending=false;approvalPanel.hidden=true;
+ if(workflowIndex>=0){workflowRunLog.push({event:'workflow.emergency_stopped',at:new Date().toISOString()});workflowIndex=-1;workflowFailed=false;setSignalState('idle','emergency stop');renderWorkflow();}
+ // Clear queued local missions and stop any running task; no external job is cancellable in offline mode.
+ if(typeof localTask!=='undefined'&&localTask){localTask=null;renderTask();}
+ addHistory('security.emergency_stop','Local simulation locked; queued execution blocked');securityRender();
+};
+for(const id of ['sim-budget-steps','sim-budget-total'])byId(id).onchange=()=>checkSimulationBudget();
+byId('security-reset').onclick=()=>{if(!securityLocked)return;securityLocked=false;simulationToggle.checked=false;addHistory('security.lock_reset','Simulation remains disabled until explicitly enabled');securityRender()};
+securityRender();
+byId('workflow-run').onclick=()=>{if(workflowIndex<0&&workflow.length&&!localTask)securityStart();};
+byId('workflow-next').onclick=()=>{
+ if(workflowIndex<0||workflowFailed)return;
+ const step=workflow[workflowIndex];workflowRunLog.push({event:'step.completed',index:workflowIndex,at:new Date().toISOString()});addHistory('workflow.step.completed',step.from+' → '+step.to);
+ workflowIndex++;if(workflowIndex>=workflow.length){workflowIndex=-1;workflowFailed=false;setSignalState('idle','workflow complete');workflowRunLog.push({event:'workflow.completed',at:new Date().toISOString()});addHistory('workflow.completed','All steps completed');renderWorkflow()}else activateWorkflowStep();
+};
+byId('workflow-fail').onclick=()=>{if(workflowIndex<0||workflowFailed)return;workflowFailed=true;setSignalState('idle','workflow step failed');workflowRunLog.push({event:'step.failed',index:workflowIndex,at:new Date().toISOString()});addHistory('workflow.step.failed',workflow[workflowIndex].action);renderWorkflow()};
+byId('workflow-retry').onclick=()=>{if(workflowIndex<0||!workflowFailed)return;
+ const retries=simulationRetries.get(workflowIndex)||0;
+ if(retries>=SIM_RETRY_LIMIT){status.textContent='Retry limit reached: '+SIM_RETRY_LIMIT+' retries per workflow step. Stop and review the workflow.';addHistory('security.retry_limited','Step '+(workflowIndex+1));return;}
+ simulationRetries.set(workflowIndex,retries+1);
+ workflowRunLog.push({event:'step.retry',index:workflowIndex,at:new Date().toISOString()});addHistory('workflow.step.retry',workflow[workflowIndex].action);activateWorkflowStep()};
+byId('workflow-report').onclick=()=>exportJSON('orbital-nexus-workflow-run-report.json',{version:1,simulation:true,started:workflowRunStarted,exported:new Date().toISOString(),steps:workflow,events:workflowRunLog});
+byId('workflow-stop').onclick=()=>{
+ if(workflowIndex<0)return;
+ byId('workflow-stop-confirm').dataset.open='true';
+ byId('workflow-stop-no').focus();
+};
+byId('workflow-stop-no').onclick=()=>{
+ byId('workflow-stop-confirm').dataset.open='false';
+ byId('workflow-stop').focus();
+};
+byId('workflow-stop-yes').onclick=()=>{
+ byId('workflow-stop-confirm').dataset.open='false';
+ if(workflowIndex<0)return;workflowRunLog.push({event:'workflow.cancelled',at:new Date().toISOString()});workflowIndex=-1;workflowFailed=false;setSignalState('idle','workflow stopped');addHistory('workflow.cancelled','User stopped simulation');renderWorkflow()};
+byId('workflow-reset').onclick=()=>{if(workflowIndex>=0)return;workflow=[];persistWorkflow();renderWorkflow()};
+byId('workflow-export').onclick=()=>exportJSON('orbital-nexus-workflow.json',{version:1,mode:'offline-simulation',name:byId('workflow-name').value.trim(),steps:workflow});
+byId('workflow-import').onclick=()=>byId('workflow-file').click();
+byId('workflow-file').onchange=async e=>{const f=e.target.files?.[0];if(!f||workflowIndex>=0)return;try{
+ if(f.size>100000)throw Error('File exceeds 100 KB');const data=JSON.parse(await f.text());
+ if(!Array.isArray(data.steps))throw Error('Missing steps');
+ const allowed=['ChatGPT','GitHub','Browser','Netlify','Higgsfield','Storage','Render'];
+ const steps=data.steps.slice(0,20).map(s=>({from:String(s.from||''),to:String(s.to||''),action:String(s.action||'').slice(0,90)}));
+ if(steps.some(s=>!validStationName(s.from)||!validStationName(s.to)||s.from===s.to||/[\u0000-\u001f]/.test(s.action)))throw Error('Invalid station route');
+ workflow=steps;byId('workflow-name').value=String(data.name||'').slice(0,80);persistWorkflow();renderWorkflow();addHistory('workflow.imported',steps.length+' steps');
+ }catch(err){status.textContent='Workflow import failed: '+err.message}e.target.value=''};
+renderWorkflow();
+byId('event-export').onclick=()=>exportJSON('orbital-nexus-event-history.json',{version:1,source:'local simulation',events:history.map(e=>({...e}))});
+byId('task-finish').onclick=()=>endLocalTask('completed');byId('task-fail').onclick=()=>endLocalTask('failed');byId('event-clear').onclick=()=>{history.length=0;renderHistory()};
+renderHistory();renderRegistry();renderTask();
+// V12 dashboard is observational only; no changes to workflow or routing state.
+const opsCounters={completed:0,failed:0};
+const opsRecent=[];
+const opsNames=['ChatGPT','GitHub','Browser','Netlify','Higgsfield','Storage','Render'];
+const opsActivity=new Map(opsNames.map(name=>[name,0]));
+const opsActivityNodes=new Map();
+const activityContainer=byId('ops-activity');
+for(const name of opsNames){
+ const row=document.createElement('div');row.className='ops-activity-row';
+ const label=document.createElement('span');label.textContent=name;
+ const track=document.createElement('div');track.className='ops-activity-track';
+ const fill=document.createElement('div');fill.className='ops-activity-fill';track.append(fill);
+ const count=document.createElement('span');count.textContent='0';
+ row.append(label,track,count);activityContainer.append(row);
+ opsActivityNodes.set(name,{fill,count});
+}
+const opsStationNodes=new Map();
+for(const name of opsNames){const row=document.createElement('div');const label=document.createElement('span');label.textContent=name;const state=document.createElement('span');state.className='idle';state.textContent='IDLE';row.append(label,state);byId('ops-stations').append(row);opsStationNodes.set(name,state)}
+function renderOps(){
+ const active=workflowIndex>=0||!!localTask;
+ byId('ops-queued').textContent=String(queue.length);
+ byId('ops-active').textContent=active?'1':'0';
+ byId('ops-completed').textContent=String(opsCounters.completed);
+ byId('ops-failed').textContent=String(opsCounters.failed);
+ const step=workflowIndex>=0?workflow[workflowIndex]:null;
+ const pair=step?[step.from,step.to]:localTask?['ChatGPT','GitHub']:signalState==='running'?currentRoute:null;
+ byId('ops-route').textContent=pair?pair[0]+' → '+pair[1]+(workflowFailed?' · FAILED':signalState==='running'?' · SIGNAL ACTIVE':' · TIMELINE ONLY'):'None · Network idle';
+ for(const [name,node] of opsStationNodes){const isOn=!!pair&&pair.includes(name)&&!workflowFailed;node.className=isOn?'on':'idle';node.textContent=isOn?'ACTIVE':'IDLE'}
+ const feed=byId('ops-recent');feed.replaceChildren();
+ for(const event of history.slice(0,6)){const row=document.createElement('div');row.textContent=event.time+' · '+event.type+' · '+event.detail;feed.append(row)}
+ if(!history.length)feed.textContent='No events yet';
+ const peak=Math.max(1,...opsActivity.values());
+ for(const [name,nodes] of opsActivityNodes){
+  const n=opsActivity.get(name)||0;
+  nodes.fill.style.width=(n/peak*100)+'%';
+  nodes.count.textContent=String(n);
+ }
+}
+// Wrap existing event and workflow rendering; all original handlers remain intact.
+const originalAddHistory=addHistory;
+addHistory=function(type,detail){originalAddHistory(type,detail);
+ if(type==='workflow.step.retry'||type==='workflow.cancelled'||type==='workflow.started'){
+  const alert=byId('mission-alert');
+  if(alert&&missionAlertEvent?.type==='workflow.step.failed'){
+   missionAlertDismissed=missionAlertEvent;
+   clearTimeout(missionAlertFadeTimer);clearTimeout(missionAlertHideTimer);
+   alert.dataset.visible='false';alert.dataset.fading='false';
+  }
+ }
+ if(type==='workflow.step.started'){
+  const step=workflow[workflowIndex];
+  if(step){for(const name of [step.from,step.to])opsActivity.set(name,(opsActivity.get(name)||0)+1)}
+ }else if(type==='mission.started'||type==='task.started'){
+  for(const name of ['ChatGPT','GitHub'])opsActivity.set(name,(opsActivity.get(name)||0)+1)
+ }
+if(type==='workflow.completed'||type==='task.completed')opsCounters.completed++;if(type==='workflow.step.failed'||type==='task.failed')opsCounters.failed++;renderOps()};
+const originalRenderWorkflow=renderWorkflow;
+renderWorkflow=function(){originalRenderWorkflow();renderOps()};
+const originalRenderQueue=renderQueue;
+renderQueue=function(){originalRenderQueue();renderOps()};
+const originalSetSignalState=setSignalState;
+setSignalState=function(next,source){originalSetSignalState(next,source);renderOps()};
+renderOps();
+const drawerActivityPreference=byId('drawer-show-activity');
+try{drawerActivityPreference.checked=localStorage.getItem('orbital.drawer.activity')!=='false'}catch(_){}
+function applyDrawerActivityPreference(){
+ byId('mission-ticker').dataset.suppressed=String(!drawerActivityPreference.checked);
+ try{localStorage.setItem('orbital.drawer.activity',String(drawerActivityPreference.checked))}catch(_){}
+}
+drawerActivityPreference.addEventListener('change',applyDrawerActivityPreference);
+applyDrawerActivityPreference();
+const hudVisibility=byId('hud-visible'),hudCompact=byId('hud-compact'),hudPosition=byId('hud-position'),hudRoot=byId('orbital-status-hud');
+try{
+ hudVisibility.checked=localStorage.getItem('orbital.hud.visible')!=='false';
+ hudCompact.checked=localStorage.getItem('orbital.hud.compact')==='true';
+ const savedPosition=localStorage.getItem('orbital.hud.position');
+ if(['left','center','right'].includes(savedPosition))hudPosition.value=savedPosition;
+}catch(_){}
+function applyHudPreferences(){
+ hudRoot.dataset.hidden=String(!hudVisibility.checked);
+ hudRoot.dataset.compact=String(hudCompact.checked);
+ hudRoot.dataset.position=hudPosition.value;
+ try{
+  localStorage.setItem('orbital.hud.visible',String(hudVisibility.checked));
+  localStorage.setItem('orbital.hud.compact',String(hudCompact.checked));
+  localStorage.setItem('orbital.hud.position',hudPosition.value);
+ }catch(_){}
+}
+hudVisibility.addEventListener('change',applyHudPreferences);
+hudCompact.addEventListener('change',applyHudPreferences);
+hudPosition.addEventListener('change',applyHudPreferences);
+applyHudPreferences();
+function updateMissionDrawerStatus(){
+ const indicator=byId('mission-state');
+ const alert=byId('mission-alert');
+ const terminal=latestTerminalEvent();
+ const failureRecovered=!!terminal&&terminal.type==='workflow.step.failed'&&
+   (!workflowFailed || workflowIndex<0);
+ if(failureRecovered && terminal===missionAlertEvent){
+  clearTimeout(missionAlertFadeTimer);
+  clearTimeout(missionAlertHideTimer);
+  missionAlertDismissed=terminal;
+  alert.dataset.visible='false';
+  alert.dataset.fading='false';
+ }
+ if(terminal!==missionAlertEvent){
+  missionAlertEvent=terminal;
+  clearTimeout(missionAlertFadeTimer);
+  clearTimeout(missionAlertHideTimer);
+  alert.dataset.fading='false';
+  if(terminal){
+   missionAlertDismissed=null;
+   const failed=terminal.type.includes('failed');
+   alert.dataset.kind=failed?'failed':'completed';
+   byId('mission-alert-text').textContent=(failed?'⚠ Attention: ':'✓ Completed: ')+terminal.detail;
+   alert.dataset.visible='true';
+   if(!failed){
+    const event=terminal;
+    missionAlertFadeTimer=setTimeout(()=>{
+     if(missionAlertEvent!==event||missionAlertDismissed===event)return;
+     alert.dataset.fading='true';
+     missionAlertHideTimer=setTimeout(()=>{
+      if(missionAlertEvent!==event||missionAlertDismissed===event)return;
+      missionAlertDismissed=event;
+      alert.dataset.visible='false';
+      alert.dataset.fading='false';
+     },650);
+    },4000);
+   }
+  }else alert.dataset.visible='false';
+ }
+ if(missionAlertDismissed===terminal)alert.dataset.visible='false';
+
+ const latest=history[0],ticker=byId('mission-ticker');
+ ticker.dataset.visible=String(!!latest);
+ if(latest){
+  byId('mission-ticker-text').textContent=latest.type+' · '+latest.detail;
+  byId('mission-ticker-time').textContent=latest.time;
+ }
+ const track=byId('mission-mini-track'),fill=byId('mission-mini-fill');
+ const progress=workflowIndex>=0&&workflow.length?Math.round((workflowIndex+(workflowFailed?0:0))/workflow.length*100):localTask?Math.max(0,Math.min(100,Number(localTask.progress)||0)):0;
+ const active=workflowIndex>=0||!!localTask||signalState==='running';
+ track.dataset.active=String(active);
+ const quick=byId('mission-quick'),route=byId('mission-quick-route'),open=byId('mission-quick-open');
+ quick.dataset.active=String(active);
+ route.textContent=workflowIndex>=0
+   ?workflow[workflowIndex].from+' → '+workflow[workflowIndex].to+(workflowFailed?' · FAILED':'')
+   :localTask?'ChatGPT → GitHub · '+Math.round(Number(localTask.progress)||0)+'%'
+   :signalState==='running'?currentRoute.join(' → '):'';
+ open.textContent=workflowIndex>=0?'View workflow':localTask?'View mission':'View signal';
+ track.setAttribute('aria-valuenow',String(progress));
+ const hud=byId('orbital-status-hud');
+ hud.dataset.active=String(active);
+ hud.dataset.failed=String(workflowIndex>=0&&workflowFailed);
+ byId('orbital-hud-title').textContent=workflowFailed&&workflowIndex>=0?'Workflow failed':workflowIndex>=0?'Workflow · Step '+(workflowIndex+1)+'/'+workflow.length:localTask?'Mission · '+Math.round(Number(localTask.progress)||0)+'%':'Signal active';
+ byId('orbital-hud-route').textContent=route.textContent;
+ byId('orbital-hud-fill').style.width=progress+'%';
+ fill.style.width=progress+'%';
+ if(workflowIndex>=0){
+  indicator.dataset.state=workflowFailed?'failed':'running';
+  indicator.textContent=(workflowFailed?'Failed · ':'Running · ')+(workflowIndex+1)+'/'+workflow.length+' · '+workflow[workflowIndex].from+' → '+workflow[workflowIndex].to;
+ }else if(localTask){
+  indicator.dataset.state='running';
+  indicator.textContent='Running · '+localTask.progress+'% · '+localTask.name;
+ }else if(signalState==='running'){
+  indicator.dataset.state='running';
+  indicator.textContent='Signal active · '+currentRoute.join(' → ');
+ }else{
+  indicator.dataset.state='idle';
+  indicator.textContent='No active workflow';
+ }
+}
+let missionAlertDismissed=null;
+let missionAlertEvent=null;
+let missionAlertFadeTimer=null;
+let missionAlertHideTimer=null;
+function latestTerminalEvent(){
+ return history.find(e=>/^(workflow\.completed|workflow\.step\.failed|task\.completed|task\.failed|mission\.completed|mission\.failed)$/.test(e.type))||null;
+}
+byId('mission-alert-review').addEventListener('click',()=>{
+ const toggle=byId('mission-toggle');
+ if(toggle.getAttribute('aria-expanded')==='false')toggle.click();
+ const status=byId('workflow-run-status');
+ const details=status?.closest('details');
+ if(details)details.open=true;
+ requestAnimationFrame(()=>{
+  const target=workflowFailed&&workflowIndex>=0?byId('workflow-retry'):status;
+  if(target){target.scrollIntoView({behavior:'smooth',block:'nearest'});if(target===byId('workflow-retry'))target.focus({preventScroll:true})}
+ });
+});
+byId('mission-alert-dismiss').addEventListener('click',()=>{
+ missionAlertDismissed=missionAlertEvent;
+ clearTimeout(missionAlertFadeTimer);
+ clearTimeout(missionAlertHideTimer);
+ byId('mission-alert').dataset.visible='false';
+ byId('mission-alert').dataset.fading='false';
+});
+const originalRenderOps=renderOps;
+renderOps=function(){originalRenderOps();updateMissionDrawerStatus()};
+const originalRenderTaskForDrawer=renderTask;
+renderTask=function(){originalRenderTaskForDrawer();updateMissionDrawerStatus()};
+updateMissionDrawerStatus();
+setInterval(updateMissionDrawerStatus,1000);
+byId('ops-export').onclick=()=>exportJSON('orbital-nexus-operations-report.json',{
+ version:1,source:'offline-simulation',exported:new Date().toISOString(),
+ counters:{queued:queue.length,active:workflowIndex>=0||!!localTask?1:0,...opsCounters},
+ stationActivity:Object.fromEntries(opsActivity),
+ currentWorkflow:workflow.map(step=>({...step})),
+ currentStep:workflowIndex,
+ recentEvents:history.slice(0,100).map(event=>({...event}))
+});
+byId('ops-reset').onclick=()=>{
+ opsCounters.completed=0;opsCounters.failed=0;
+ for(const name of opsNames)opsActivity.set(name,0);
+ renderOps();
+};
+// Feed contract: GET endpoint returns {id, type, route}; type: task.started/task.completed/task.failed.
+// No credentials are stored; use a backend proxy for authentication.
+async function pollFeed(url){try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const body=await r.json();const event=Array.isArray(body)?body.at(-1):body.event||body;if(!event||!event.id||event.id===lastEventId)return;lastEventId=event.id;if(event.route&&!['chatgpt-render-github','chatgpt-ring-github','chatgpt-outer-ring-github'].includes(event.route))return;if(workflowIndex<0&&!localTask){if(event.type==='task.started'){buildRuntimeStream('ChatGPT','GitHub');setSignalState('running','gateway event')}if(['task.completed','task.failed','task.cancelled'].includes(event.type))setSignalState('idle','gateway event');}addHistory(event.type||'gateway.event',String(event.id))}catch(e){status.textContent='Event feed error: '+e.message+' · Demo remains available'}}
+document.querySelector('#demo').onclick=()=>{if(workflowIndex>=0||localTask){status.textContent='Finish the active workflow or mission before using Demo';return}buildRuntimeStream('ChatGPT','GitHub');setSignalState('running');addHistory('task.started','GPT → GitHub · manual demo')};document.querySelector('#complete').onclick=()=>{if(workflowIndex>=0){status.textContent='Use Complete Step in the workflow panel';return}if(localTask)endLocalTask('completed');else{setSignalState('idle');addHistory('task.completed','manual demo')}};document.querySelector('#connect-events').onclick=()=>{
+ status.textContent='External event feeds are disabled in V41. Secure gateway authorization is not configured.';
+ addHistory('gateway.blocked','External event feed connection requires a future explicit setup');
+};
+let actionStation=null;
+function openStationActions(name,id){
+ actionStation={name,id,routeName:id==='render'?'Render':name};
+ byId('sap-name').textContent=name;
+ byId('sap-role').textContent=roleDescriptions[id]||'Station';
+ byId('sap-connection').textContent='Connection: '+statusLabels[id];
+ byId('sap-feedback').textContent='';
+ byId('sap-source').disabled=workflowIndex>=0;
+ byId('sap-destination').disabled=workflowIndex>=0;
+ refreshStationRoute();
+ byId('station-action-panel').dataset.open='true';
+}
+byId('sap-close').onclick=()=>{byId('station-action-panel').dataset.open='false'};
+function refreshStationRoute(){
+ const from=byId('workflow-from').value,to=byId('workflow-to').value;
+ const valid=from!==to&&workflowIndex<0&&workflow.length<20;
+ byId('sap-route').textContent='Draft route: '+from+' → '+to+(from===to?' · choose different stations':(!ROUTE_STATIONS[from]||!ROUTE_STATIONS[to])?' · logical only (no physical red path)':'');
+ byId('sap-add-route').disabled=!valid;
+}
+byId('workflow-from').addEventListener('change',refreshStationRoute);
+byId('workflow-to').addEventListener('change',refreshStationRoute);
+function setStationEndpoint(which){
+ if(!actionStation||workflowIndex>=0){byId('sap-feedback').textContent='Stop the active workflow before editing.';return}
+ const field=byId(which==='source'?'workflow-from':'workflow-to');
+ field.value=actionStation.routeName;
+ if(field.value!==actionStation.routeName){byId('sap-feedback').textContent='Station is unavailable in the workflow builder.';return}
+ byId('sap-feedback').textContent=actionStation.name+' selected as '+which+'.';
+ refreshStationRoute();
+ addHistory('workflow.endpoint.selected',actionStation.name+' · '+which);
+}
+byId('sap-source').onclick=()=>setStationEndpoint('source');
+byId('sap-destination').onclick=()=>setStationEndpoint('destination');
+byId('sap-add-route').onclick=()=>{
+ if(workflowIndex>=0){byId('sap-feedback').textContent='Cannot edit while a workflow is running.';return}
+ if(workflow.length>=20){byId('sap-feedback').textContent='Workflow is full (20 steps).';return}
+ const from=byId('workflow-from').value,to=byId('workflow-to').value;
+ if(from===to){byId('sap-feedback').textContent='Select two different stations.';return}
+ const before=workflow.length;
+ byId('workflow-add-step').click();
+ if(workflow.length===before+1){
+  byId('sap-feedback').textContent='Added '+from+' → '+to+' to workflow ('+workflow.length+'/20 steps).';
+ }else byId('sap-feedback').textContent='Could not add route. Open the workflow builder.';
+ refreshStationRoute();
+};
+byId('sap-workflow').onclick=()=>{
+ const panel=byId('mission-panel');
+ if(panel.classList.contains('is-collapsed'))byId('mission-toggle').click();
+ const details=byId('workflow-from').closest('details');
+ if(details)details.open=true;
+ byId('workflow-from').scrollIntoView({behavior:'smooth',block:'nearest'});
+};
+function select(name,x,y,id){openStationActions(name,id);selection={name,x,y,id};document.querySelector('#selected').textContent=name;document.querySelector('#details').textContent=`${name} is selected. This is a local scene interaction; it does not send commands to ${name} or connect to a service.`;document.querySelector('#connection').textContent='Connection: '+statusLabels[id];byId('station-inspector').textContent=name+' · '+(roleDescriptions[id]||'Station')+' · '+statusLabels[id]+'. Live actions disabled.';addHistory('station.selected',name);for(const [key,b] of buttons)b.classList.toggle('station-active',key===id);if(mode==='explore'){controls.target.set(x,1.4,-y);controls.update()}status.textContent=`Selected ${name} · ${statusLabels[id]} · Demo only.`}
+// Click a station's existing geometry. Coordinates are Blender X/Y mapped to Three.js X/-Z.
+const hotspots=modules.map(([name,x,y,id])=>({name,x,y,id,center:new THREE.Vector3(x,1.4,-y),radius:id==='render'?4.5:3.7}));let pointerDown=null;
+renderer.domElement.addEventListener('pointerdown',e=>{pointerDown={x:e.clientX,y:e.clientY}});
+renderer.domElement.addEventListener('pointerup',e=>{if(!model||!pointerDown)return;const travel=Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y);pointerDown=null;if(travel>8)return;const bounds=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-bounds.left)/bounds.width*2-1,-(e.clientY-bounds.top)/bounds.height*2+1);raycaster.setFromCamera(pointer,camera);const hits=raycaster.intersectObject(model,true);if(!hits.length)return;const point=hits[0].point;let best=null,dist=Infinity;for(const h of hotspots){const d=Math.hypot(point.x-h.center.x,point.z-h.center.z);if(d<h.radius && d<dist){dist=d;best=h}}if(best)select(best.name,best.x,best.y,best.id)});
+function setMode(next){mode=next;controls.enabled=next==='explore';document.querySelector('#command').classList.toggle('active',mode==='command');document.querySelector('#explore').classList.toggle('active',mode==='explore');if(next==='command')resetCamera();status.textContent=next==='explore'?'Explore Mode: drag to rotate, pinch or scroll to zoom.':'Command Mode: approved cinematic view locked.'}
+function resetCamera(){controls.target.set(0,-.5,0);camera.position.set(0,25,42);camera.lookAt(controls.target);controls.update()}document.querySelector('#command').onclick=()=>setMode('command');document.querySelector('#explore').onclick=()=>setMode('explore');document.querySelector('#reset').onclick=resetCamera;const loader=new GLTFLoader();let modelLoadSerial=0;
+// GLTF resources belong to the imported model, not to the fixed blue/red overlays.
+// Dispose only after the old model is detached and the new one is ready.
+function disposeImportedModel(root){
+ if(!root)return;
+ const geometries=new Set(),materials=new Set(),textures=new Set();
+ root.traverse(o=>{
+  if(o.geometry)geometries.add(o.geometry);
+  const mats=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];
+  for(const mat of mats){
+   if(!mat)continue;
+   materials.add(mat);
+   for(const key of Object.keys(mat)){
+    const val=mat[key];
+    if(val?.isTexture)textures.add(val);
+   }
+  }
+ });
+ geometries.forEach(g=>g.dispose());
+ materials.forEach(m=>m.dispose());
+ textures.forEach(t=>t.dispose());
+}
+const inspectorToggle=document.getElementById('model-inspector-toggle');
+const inspectorPanel=document.getElementById('model-inspector');
+try{inspectorPanel.dataset.expanded=localStorage.getItem('orbital.inspector.expanded')!=='false'}catch(_){}
+function syncInspectorToggle(){
+ const expanded=inspectorPanel.dataset.expanded!=='false';
+ inspectorToggle.textContent=expanded?'Hide details':'Show details';
+ inspectorToggle.setAttribute('aria-expanded',String(expanded));
+}
+inspectorToggle.addEventListener('click',()=>{
+ inspectorPanel.dataset.expanded=String(inspectorPanel.dataset.expanded==='false');
+ syncInspectorToggle();
+ try{localStorage.setItem('orbital.inspector.expanded',inspectorPanel.dataset.expanded)}catch(_){}
+});
+syncInspectorToggle();
+let currentModelReport=null;
+document.getElementById('model-inspector-export').addEventListener('click',()=>{
+ if(!currentModelReport)return;
+ const blob=new Blob([JSON.stringify(currentModelReport,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');a.href=url;a.download='orbital-model-report.json';
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+let selectedModelDetails=null;
+function updateModelInspector(details){
+ const panel=document.getElementById('model-inspector');
+ panel.dataset.visible=String(!!details);
+ if(!details)return;
+ document.getElementById('model-inspector-name').textContent=details.name;
+ document.getElementById('model-inspector-details').textContent=details.summary;
+}
+const diagnostic=window.orbitalDiagnostics;
+loader.manager.onError=url=>{
+ diagnostic.report.resourceErrors??=[];
+ diagnostic.report.resourceErrors.push({at:new Date().toISOString(),resource:url.startsWith('blob:')?'embedded texture':url});
+ if(diagnostic.report.resourceErrors.length>100)diagnostic.report.resourceErrors.shift();
+ diagnostic.log('Resource warning','A model resource could not load. Geometry may load with missing textures. Save diagnostics for details.');
+};
+async function installModel(gltf,serial,details){
+ if(serial!==modelLoadSerial){disposeImportedModel(gltf.scene);return;}
+ const candidate=gltf.scene;
+ let nextMixer=null,meshCount=0,triangleCount=0;
+ const clips=gltf.animations||[];
+ try{
+  if(!candidate)throw new Error('The GLB has no default scene.');
+  candidate.traverse(o=>{if(!o.isMesh)return;meshCount++;const geo=o.geometry,pos=geo?.getAttribute('position');if(pos)triangleCount+=Math.floor((geo.index?.count??pos.count)/3);});
+  if(!meshCount)throw new Error('The GLB scene contains no mesh geometry.');
+  if(clips.length){
+   nextMixer=new THREE.AnimationMixer(candidate);
+   for(const clip of clips){
+    const tracks=clip.tracks.filter(t=>!/^V29_RED_RING_|^V28_EVENT_RED_PACKET_|^V27_EVENT_GPT_HUB_GITHUB_/.test(t.name));
+    if(tracks.length)nextMixer.clipAction(new THREE.AnimationClip(clip.name,clip.duration,tracks)).setLoop(THREE.LoopRepeat,Infinity).play();
+   }
+  }
+ }catch(err){nextMixer?.stopAllAction();disposeImportedModel(candidate);throw err;}
+ const previousModel=model,previousMixer=mixer,previousCount=animationCount;
+ try{
+  model=candidate;scene.add(candidate);configureSignals();
+  candidate.traverse(o=>{if(o.isMesh)o.frustumCulled=true;});
+  mixer=nextMixer;animationCount=clips.length;
+ }catch(err){
+  scene.remove(candidate);model=previousModel;mixer=previousMixer;animationCount=previousCount;
+  nextMixer?.stopAllAction();disposeImportedModel(candidate);
+  try{configureSignals()}catch(rollback){console.error('Signal restoration failed',rollback);}
+  throw err;
+ }
+ if(previousModel)scene.remove(previousModel);
+ previousMixer?.stopAllAction();if(previousModel)previousMixer?.uncacheRoot(previousModel);
+ disposeImportedModel(previousModel);resetCamera();
+ currentModelReport={schema:'orbital-nexus-model-report-v1',filename:details.name,fileBytes:details.size,meshCount,triangleCount,animationCount,generatedAt:new Date().toISOString()};
+ updateModelInspector({name:details.name,summary:`${(details.size/1048576).toFixed(1)} MB · ${meshCount} meshes · ${triangleCount.toLocaleString()} triangles · ${animationCount} animations`});
+ diagnostic.log('Loaded',`Orbital Nexus loaded · ${meshCount} meshes · ${animationCount} animation clips · Select a station or Explore.`);
+}
+function validateGLB(buffer){
+ const view=new DataView(buffer);
+ if(buffer.byteLength<20)throw new Error('File is too small to be a valid GLB.');
+ if(view.getUint32(0,true)!==0x46546c67)throw new Error('Not a binary glTF (GLB) file.');
+ if(view.getUint32(4,true)!==2)throw new Error('Unsupported GLB version; expected glTF 2.0.');
+ if(view.getUint32(8,true)!==buffer.byteLength)throw new Error('GLB length does not match the file size.');
+ let offset=12,json=null,binary=false;
+ while(offset<buffer.byteLength){
+  if(offset+8>buffer.byteLength)throw new Error('Incomplete GLB chunk header.');
+  const length=view.getUint32(offset,true),type=view.getUint32(offset+4,true),end=offset+8+length;
+  if(length%4||end>buffer.byteLength)throw new Error('Invalid or truncated GLB chunk.');
+  if(offset===12&&type!==0x4e4f534a)throw new Error('The first GLB chunk must be JSON.');
+  if(type===0x4e4f534a){
+   if(json)throw new Error('Duplicate GLB JSON chunk.');
+   json=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(new Uint8Array(buffer,offset+8,length)));
+  }else if(type===0x004e4942){if(binary)throw new Error('Duplicate GLB binary chunk.');binary=true;}
+  offset=end;
+ }
+ if(!json||json.asset?.version!=='2.0')throw new Error('Missing glTF 2.0 asset metadata.');
+ const external=[...(json.buffers||[]),...(json.images||[])].filter(x=>x.uri&&!x.uri.startsWith('data:'));
+ if(external.length)throw new Error('This GLB references external files. Re-export with buffers and textures embedded.');
+ const unsupported=(json.extensionsRequired||[]).filter(x=>['KHR_draco_mesh_compression','EXT_meshopt_compression','KHR_texture_basisu'].includes(x));
+ if(unsupported.length)throw new Error('This viewer needs an uncompressed GLB export; decoder not bundled for '+unsupported.join(', ')+'.');
+ return json;
+}
+async function importGLBFile(f){
+ if(!f||!diagnostic.report.ready)return;
+ const serial=++modelLoadSerial;
+ diagnostic.log('Reading',`${f.name} (${f.size} bytes)`);
+ try{
+  const buffer=await f.arrayBuffer();if(serial!==modelLoadSerial)return;
+  diagnostic.log('Validating',f.name);
+  const json=validateGLB(buffer);
+  diagnostic.report.lastModel={name:f.name,size:f.size,extensionsUsed:json.extensionsUsed||[],extensionsRequired:json.extensionsRequired||[]};
+  diagnostic.log('Parsing',f.name+' — large models may take a moment.');
+  const gltf=await loader.parseAsync(buffer,'');
+  await installModel(gltf,serial,{name:f.name,size:f.size});
+ }catch(err){if(serial===modelLoadSerial)diagnostic.log('Model failed',(err?.message||String(err))+' Existing scene preserved. Use Save diagnostics for details.',err);}
+}
+document.querySelector('#picker').addEventListener('change',e=>{
+ const f=e.target.files?.[0];
+ e.target.value='';
+ if(f)importGLBFile(f);
+});
+// Drag-and-drop uses the identical validation, serial protection and model swap
+// as the file picker. A drag depth counter avoids flicker over nested elements.
+const dropZone=document.getElementById('glb-drop-zone');
+let dragDepth=0;
+function isFileDrag(e){return Array.from(e.dataTransfer?.types||[]).includes('Files')}
+window.addEventListener('dragenter',e=>{
+ if(!isFileDrag(e))return;
+ e.preventDefault();dragDepth++;
+ dropZone.dataset.visible='true';
+});
+window.addEventListener('dragover',e=>{
+ if(!isFileDrag(e))return;
+ e.preventDefault();
+ e.dataTransfer.dropEffect='copy';
+});
+window.addEventListener('dragleave',e=>{
+ if(!isFileDrag(e))return;
+ e.preventDefault();
+ dragDepth=Math.max(0,dragDepth-1);
+ if(dragDepth===0)dropZone.dataset.visible='false';
+});
+window.addEventListener('drop',e=>{
+ e.preventDefault();
+ dragDepth=0;
+ dropZone.dataset.visible='false';
+ const files=Array.from(e.dataTransfer?.files||[]);
+ if(files.length!==1){
+  status.textContent='Drop exactly one GLB file. Existing scene preserved.';
+  return;
+ }
+ const f=files[0];
+ if(!/\.glb$/i.test(f.name)){
+  status.textContent='Only .glb files are supported. Existing scene preserved.';
+  return;
+ }
+ importGLBFile(f);
+});
+window.addEventListener('blur',()=>{dragDepth=0;dropZone.dataset.visible='false'});
+// Load bundled scene automatically if present; user can always import a newer GLB.
+if(location.protocol!=='file:')fetch('./orbital-nexus.glb',{method:'HEAD'}).then(async r=>{
+ if(!r.ok||modelLoadSerial!==0)return;
+ const response=await fetch('./orbital-nexus.glb');if(!response.ok)throw new Error('Bundled GLB HTTP '+response.status);
+ const data=await response.blob();if(modelLoadSerial===0)await importGLBFile(new File([data],'orbital-nexus.glb'));
+}).catch(err=>{if(modelLoadSerial===0)diagnostic.log('Bundled model unavailable',err.message+' Use Load GLB.',err);});
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});document.addEventListener('visibilitychange',()=>{if(document.hidden)renderer.setAnimationLoop(null);else renderer.setAnimationLoop(frame)});function frame(){const dt=Math.min(clock.getDelta(),.05);if(mixer&&animationRunning)mixer.update(dt);controls.update();if(signalState==='running')updateRuntimeStream(dt);if(false&&signalMeshes.length){signalTime+=dt;const A=new THREE.Vector3(-8.3,.46,-8),H=new THREE.Vector3(0,.46,0),B=new THREE.Vector3(8.3,.46,-8);const l1=A.distanceTo(H),l2=H.distanceTo(B),total=l1+l2;for(const o of signalMeshes){const lane=Number(o.userData.lane??o.name.match(/PACKET_(\d+)_/)?.[1]??2);const idx=Number(o.userData.packet_index??o.name.match(/_(\d+)$/)?.[1]??0);const d=((idx/24+signalTime*1.75+lane*.027)%1)*total;const point=d<l1?A.clone().lerp(H,d/l1):H.clone().lerp(B,(d-l1)/l2);const tangent=d<l1?H.clone().sub(A).normalize():B.clone().sub(H).normalize();point.x+=-tangent.z*(lane-2)*.1;point.z+=tangent.x*(lane-2)*.1; // Convert world path coordinates to local coordinates of the imported mesh parent.
+if(o.parent){o.parent.updateWorldMatrix(true,false);o.position.copy(o.parent.worldToLocal(point))}else o.position.copy(point)}}
+positionLogicalMarkers();renderer.render(scene,camera)}renderer.setAnimationLoop(frame);buildBlueNetwork();updateSignalAppearance();
+renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();diagnostic.log('Graphics context lost','Reload the viewer to restore WebGL, then load the GLB again.');});
+diagnostic.ready();
+</script>
+<style>
+#v51-open{position:fixed;left:14px;top:95px;z-index:19;background:#103f59;border:1px solid #6edaff;color:white;padding:10px;border-radius:9px;cursor:pointer}
+#v51-panel{position:fixed;left:14px;top:143px;bottom:64px;width:min(360px,calc(100vw - 28px));z-index:20;background:#071d2df5;border:1px solid #4a9ebd;border-radius:12px;padding:14px;overflow:auto;color:#def;font:12px system-ui;display:none}
+#v51-panel[data-open=true]{display:block}#v51-panel input,#v51-panel select{width:100%;margin:5px 0;padding:8px;background:#0c2b40;border:1px solid #39758c;color:white;border-radius:6px}
+#v51-panel button{margin:3px;padding:7px;background:#12435b;border:1px solid #418eaa;color:white;border-radius:7px;cursor:pointer}
+#v51-panel .v51-job{padding:8px 0;border-top:1px solid #285268;overflow-wrap:anywhere}#v51-panel .v51-state{color:#83e4fd}
+</style>
+<button id="v51-open" type="button">V51 · Engine</button>
+<section id="v51-panel" aria-label="Local workflow engine" data-open="false">
+ <div style="display:flex;justify-content:space-between;align-items:center"><strong>V51 · Durable Simulation Engine</strong><button id="v51-close" type="button">✕</button></div>
+ <p>Backend-managed, offline steps. No external APIs or provider credentials.</p>
+ <div id="v51-health">Checking local engine…</div>
+ <label>Workflow name<input id="v51-name" value="Orbital test run" maxlength="100"></label>
+ <label>Source station<select id="v51-from"><option>ChatGPT</option><option>GitHub</option><option>Netlify</option><option>Storage</option><option>Render</option><option>Browser</option><option>Higgsfield</option></select></label>
+ <label>Destination station<select id="v51-to"><option>GitHub</option><option>ChatGPT</option><option>Storage</option><option>Render</option><option>Netlify</option><option>Browser</option><option>Higgsfield</option></select></label>
+ <label>Simulated action<input id="v51-action" maxlength="100" value="Transfer task (simulation)"></label>
+ <button id="v51-add" type="button">Add Step</button><button id="v51-submit" type="button">Queue Workflow</button><button id="v51-clear" type="button">Clear Draft</button>
+ <div id="v51-draft"></div><p id="v51-message" role="status"></p>
+ <section id="v60-command" aria-label="V60 integrated workflow command center">
+<h3>V60 · Integrated Workflow Control</h3>
+<p>One console for offline backend jobs, approvals, progress, and emergency controls. External execution remains disabled.</p>
+<div id="v60-safety" role="status">Checking backend security…</div>
+<div class="v60-actions"><button id="v60-create" type="button">Queue Draft</button><button id="v60-approve" type="button">Approve Selected</button><button id="v60-pause" type="button">Pause</button><button id="v60-resume" type="button">Resume</button><button id="v60-cancel" type="button">Cancel</button></div>
+<label>Selected backend workflow<select id="v60-select" aria-label="Select backend workflow"><option value="">No jobs</option></select></label>
+<div id="v60-state" role="status">No job selected</div>
+<div class="v60-track" role="progressbar" aria-label="Selected workflow progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="v60-fill"></div></div>
+<div id="v60-step">No current step</div><div id="v60-feedback" role="status" aria-live="polite"></div>
+<div class="v60-actions"><button id="v60-stop" type="button">EMERGENCY STOP</button><button id="v60-reset" type="button">Reset Stop (admin)</button><button id="v60-audit" type="button">View Audit</button></div><pre id="v60-audit-output" hidden></pre>
+<p>Approvals, emergency stop and reset require the administrator token entered in Backend Security Controls below. Token is never saved by this console.</p>
+</section>
+<details open id="v53-security"><summary>V53 · Backend Security Controls</summary>
+<p>Jobs require explicit administrator approval before simulation. Enter the token printed in the START_VIEWER terminal. Token stays in this page's memory and is not saved.</p>
+<label>Local admin token<input id="v53-token" type="password" autocomplete="off" placeholder="Token from startup window"></label>
+<div id="v53-policy">Loading policy…</div>
+<button id="v53-stop" type="button">EMERGENCY STOP</button><button id="v53-reset" type="button">Reset stop</button><button id="v53-audit" type="button">View audit</button>
+<pre id="v53-audit-result" style="white-space:pre-wrap;max-height:130px;overflow:auto"></pre>
+</details><strong>Persistent jobs</strong><div id="v51-jobs"></div>
+ <details id="v52-connectors"><summary>V52 · Connector Catalog (disconnected)</summary><p>Read-only adapter metadata. No provider authentication, outbound requests or live actions.</p><button id="v52-refresh" type="button">Refresh catalog</button><div id="v52-list" aria-live="polite">Catalog not loaded</div></details>
+</section>
+<script>
+(()=>{
+ const el=id=>document.getElementById(id), panel=el('v51-panel');let draft=[];
+ const safe=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const message=t=>{el('v51-message').textContent=t};
+ const req=async(path,method='GET',body)=>{let r=await fetch(path,{method,headers:method==='POST'?{'Content-Type':'application/json','X-Orbital-Admin':el('v53-token').value}:{},body:body===undefined?undefined:JSON.stringify(body)});let j=await r.json();if(!r.ok)throw Error(j.error||'Request failed');return j};
+ const adminReq=async(path,method='POST')=>{let r=await fetch(path,{method,headers:{'X-Orbital-Admin':el('v53-token').value,'Content-Type':'application/json'},body:method==='POST'?'{}':undefined});let j=await r.json();if(!r.ok)throw Error(j.error||'Request failed');return j};
+ const renderDraft=()=>{el('v51-draft').textContent=draft.map((x,i)=>`${i+1}. ${x.from} → ${x.to}: ${x.action}`).join(' | ')||'Draft empty'};
+ el('v51-open').onclick=()=>{panel.dataset.open=panel.dataset.open==='true'?'false':'true';refresh()};el('v51-close').onclick=()=>panel.dataset.open='false';
+ el('v51-add').onclick=()=>{const step={from:el('v51-from').value,to:el('v51-to').value,action:el('v51-action').value.trim()};if(step.from===step.to||!step.action||draft.length>=50)return message('Choose different stations and an action (max 50 steps).');draft.push(step);renderDraft();message('Step added')};
+ el('v51-clear').onclick=()=>{draft=[];renderDraft();message('Draft cleared')};
+ el('v51-submit').onclick=async()=>{try{if(!draft.length)throw Error('Add a step first');let j=await req('/api/v51/jobs','POST',{name:el('v51-name').value,steps:draft});message('Awaiting admin approval: '+j.id.slice(0,8));draft=[];renderDraft();refresh()}catch(e){message(e.message)}};
+ el('v51-jobs').onclick=async e=>{const b=e.target.closest('button[data-id]');if(!b)return;try{await (b.dataset.action==='approve'?adminReq('/api/v53/jobs/'+encodeURIComponent(b.dataset.id)+'/approve'):req('/api/v51/jobs/'+encodeURIComponent(b.dataset.id)+'/'+b.dataset.action,'POST',{}));refresh()}catch(err){message(err.message)}};
+ async function refresh(){if(panel.dataset.open!=='true')return;try{const [health,data]=await Promise.all([req('/api/v51/health'),req('/api/v51/jobs')]);el('v51-health').textContent='● Local engine ready · durable SQLite · '+health.providers;el('v51-jobs').innerHTML=data.jobs.map(j=>`<div class="v51-job"><strong>${safe(j.name)}</strong> <span class="v51-state">${safe(j.state)}</span><div>${j.cursor}/${j.steps.length} simulated steps · ${safe(j.id.slice(0,8))}</div>${j.state==='awaiting_approval'?`<button data-id="${j.id}" data-action="approve">Approve simulation</button>`:''}${j.state==='running'||j.state==='queued'?`<button data-id="${j.id}" data-action="pause">Pause</button>`:''}${j.state==='paused'?`<button data-id="${j.id}" data-action="resume">Resume</button>`:''}${['running','queued','paused','awaiting_approval'].includes(j.state)?`<button data-id="${j.id}" data-action="cancel">Cancel</button>`:''}</div>`).join('')||'No jobs yet'}catch(e){el('v51-health').textContent='Engine unavailable. Start with START_VIEWER.cmd (not python -m http.server).';message(e.message)}}
+ async function refreshCatalog(){try{const data=await req('/api/v52/connectors');el('v52-list').innerHTML=data.connectors.map(c=>`<div class="v51-job"><strong>${safe(c.label)}</strong> · ${safe(c.category)}<div>DISCONNECTED · ${c.capabilities.map(safe).join(', ')}</div><div>Backend execution: disabled</div></div>`).join('')}catch(e){el('v52-list').textContent='Catalog unavailable: '+e.message}}
+ el('v52-refresh').onclick=refreshCatalog;
+ el('v52-connectors').addEventListener('toggle',()=>{if(el('v52-connectors').open)refreshCatalog()});
+ el('v53-stop').onclick=async()=>{try{await adminReq('/api/v53/stop');message('Backend emergency stop engaged');refresh()}catch(e){message(e.message)}};
+ el('v53-reset').onclick=async()=>{try{await adminReq('/api/v53/reset');message('Backend emergency stop reset');refresh()}catch(e){message(e.message)}};
+ el('v53-audit').onclick=async()=>{try{const x=await adminReq('/api/v53/audit','GET');el('v53-audit-result').textContent=JSON.stringify(x.events.slice(0,15),null,2)}catch(e){message(e.message)}};
+ async function refreshPolicy(){try{const x=await req('/api/v53/policy');el('v53-policy').textContent='Emergency stop: '+(x.emergency_stop?'ACTIVE':'off')+' · Max steps/job: '+x.max_steps_per_job+' · Provider execution: DISABLED'}catch(e){el('v53-policy').textContent=e.message}}
+ renderDraft();if(!new URLSearchParams(location.search).has('fixture')){refreshPolicy();setInterval(()=>{refresh();if(panel.dataset.open==='true')refreshPolicy()},1500)}
+})();
+</script>
+<section id="v54-readiness" style="position:fixed;left:12px;bottom:100px;z-index:15;max-width:min(340px,90vw);background:#081c2deF;color:#d8f5ff;border:1px solid #3c7893;border-radius:10px;padding:10px;font:12px system-ui"><details><summary style="cursor:pointer">V54 · Connector readiness (offline)</summary><p>Checks local configuration only. No service is contacted or connected.</p><button id="v54-check" type="button">Check readiness</button><pre id="v54-results" style="white-space:pre-wrap;max-height:180px;overflow:auto">Requires V53 admin token in its panel.</pre></details></section><script>
+(()=>{const button=document.getElementById('v54-check'),output=document.getElementById('v54-results');button.addEventListener('click',async()=>{const tokenField=document.querySelector('#v53-admin-token, #admin-token, #v53-token');const token=tokenField?.value||'';if(!token){output.textContent='Enter the V53 admin token in the security panel first.';return;}try{const r=await fetch('/api/v54/readiness',{headers:{'X-Orbital-Admin':token}});if(!r.ok)throw Error('Readiness check HTTP '+r.status);const j=await r.json();output.textContent=j.connectors.map(c=>c.label+': disconnected · credential requirements '+c.credential_requirements_present+'/'+c.credential_requirements_count).join('\n')+'\nNo network health checks performed.';}catch(e){output.textContent=e.message;}})})();
+</script><section id="v55-panel" style="position:fixed;left:12px;bottom:60px;z-index:15;background:#071e30ed;border:1px solid #3887a7;border-radius:12px;padding:12px;max-width:310px;font:12px system-ui;color:#d7f5ff"><details><summary style="cursor:pointer">V55 · GitHub adapter preview (offline)</summary><p>Validates a future read-only request. No GitHub API call is made.</p><input id="v55-repo" placeholder="owner/repository" style="width:100%;background:#102c40;color:white;padding:7px"><select id="v55-resource" style="margin:7px 0;background:#102c40;color:white"><option value="repository_metadata">Repository metadata</option><option value="issues">Issues</option><option value="pull_requests">Pull requests</option></select><button id="v55-check" type="button">Validate preview</button><pre id="v55-result" style="white-space:pre-wrap;max-height:130px;overflow:auto"></pre></details></section><script>document.getElementById('v55-check').addEventListener('click',async()=>{const output=document.getElementById('v55-result');const repo=document.getElementById('v55-repo').value;const resource=document.getElementById('v55-resource').value;const token=prompt('Local V53 administrator token (never enter provider tokens)');if(!token)return;try{const res=await fetch('/api/v55/github/preview?repo='+encodeURIComponent(repo)+'&resource='+encodeURIComponent(resource),{headers:{'X-Orbital-Admin':token}});const data=await res.json();output.textContent=JSON.stringify(data,null,2)}catch(e){output.textContent=String(e)}});</script>
+<style>
+#v58-monitor{position:fixed;right:14px;bottom:18px;z-index:18;width:min(330px,calc(100vw - 28px));background:#061b2deF;border:1px solid #4aa2c1;border-radius:12px;padding:10px;color:#d9f6ff;font:12px system-ui;box-shadow:0 8px 28px #0008}
+#v58-monitor summary{cursor:pointer;font-weight:700}#v58-monitor .v58-track{height:7px;background:#17394b;border-radius:6px;overflow:hidden;margin:8px 0}#v58-monitor .v58-fill{height:100%;width:0;background:#42d8fa;transition:width .25s}#v58-monitor .v58-stations{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0}#v58-monitor .v58-stations span{border:1px solid #28586e;padding:3px 6px;border-radius:6px;color:#9eb9c7}#v58-monitor .v58-stations span.active{border-color:#ff6767;color:#fff;background:#70313d}#v58-monitor .v58-stations span.target{border-color:#ffae51;color:#fff;background:#67411f}#v58-monitor button{background:#113e55;color:white;border:1px solid #367e9c;border-radius:6px;padding:5px;cursor:pointer}#v58-monitor .v58-warning{color:#ffbf75}
+</style>
+<section id="v58-monitor" aria-label="V58 backend workflow monitor"><details open><summary>V59 · Backend Activity + 3D (simulation)</summary><p id="v58-connection" role="status">Connecting to local engine…</p><label>Track job <select id="v58-job" aria-label="Backend job to track"><option value="">Most recent job</option></select></label><div id="v58-state">No backend job selected</div><div class="v58-track" role="progressbar" aria-label="Simulated job progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="v58-progress"><div class="v58-fill" id="v58-fill"></div></div><div id="v58-route">No active route</div><div class="v58-stations" id="v58-stations"></div><p class="v58-warning" id="v58-safety">Offline simulation only · No provider calls</p><button id="v58-refresh" type="button">Refresh status</button></details></section>
+<script>
+(()=>{
+ const $=id=>document.getElementById(id), names=['ChatGPT','GitHub','Netlify','Storage','Render','Browser','Higgsfield'];
+ let selected='', lastSignature='', pending=false;
+ const stationNodes=new Map();
+ for(const name of names){const n=document.createElement('span');n.textContent=name;$('v58-stations').append(n);stationNodes.set(name,n)}
+ $('v58-job').addEventListener('change',e=>{selected=e.target.value;lastSignature='';refresh()});
+ function display(job){
+  const steps=Array.isArray(job.steps)?job.steps:[],cursor=Math.max(0,Math.min(steps.length,Number(job.cursor)||0)),pct=steps.length?Math.round(100*cursor/steps.length):0;
+  $('v58-state').textContent=job.name+' · '+job.state.toUpperCase()+' · '+cursor+'/'+steps.length+' steps';
+  $('v58-fill').style.width=pct+'%';$('v58-progress').setAttribute('aria-valuenow',String(pct));
+  const active=['running','queued'].includes(job.state)&&cursor<steps.length?steps[cursor]:null;
+  const last=cursor>0?steps[cursor-1]:null;
+  $('v58-route').textContent=active?'Simulating: '+active.from+' → '+active.to+' · '+active.action:last?'Last simulated: '+last.from+' → '+last.to:'No active route';
+  for(const [name,node] of stationNodes){node.classList.toggle('active',!!active&&active.from===name);node.classList.toggle('target',!!active&&active.to===name)}
+  $('v58-safety').textContent=job.state==='awaiting_approval'?'AWAITING ADMIN APPROVAL · No execution':job.state==='paused'?'PAUSED · No execution':job.state==='cancelled'?'CANCELLED · No execution':job.state==='failed'?'FAILED · Review engine logs':'Offline simulation only · No provider calls';
+  const signature=[job.id,job.state,cursor].join(':');if(signature!==lastSignature){lastSignature=signature;document.dispatchEvent(new CustomEvent('orbital:backend-simulation',{detail:{jobId:job.id,state:job.state,cursor,step:active?{from:active.from,to:active.to,action:active.action}:null,simulation:true}}))}
+ }
+ async function refresh(){if(pending||document.hidden)return;pending=true;try{
+  const r=await fetch('/api/v51/jobs',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json();const jobs=Array.isArray(data.jobs)?data.jobs:[];
+  $('v58-connection').textContent='● Local backend connected · read-only monitor';
+  const sel=$('v58-job'),current=selected;sel.replaceChildren();const def=document.createElement('option');def.value='';def.textContent='Most recent job';sel.append(def);
+  for(const job of jobs){const opt=document.createElement('option');opt.value=job.id;opt.textContent=job.name+' · '+job.id.slice(0,8);sel.append(opt)}
+  if(current&&jobs.some(j=>j.id===current))sel.value=current;else{selected='';sel.value=''}
+  const job=selected?jobs.find(j=>j.id===selected):jobs[0];
+  if(job)display(job);else{$('v58-state').textContent='No backend jobs yet. Create one in V51 · Engine.';$('v58-route').textContent='No active route';$('v58-fill').style.width='0%';$('v58-progress').setAttribute('aria-valuenow','0');for(const node of stationNodes.values())node.classList.remove('active','target');document.dispatchEvent(new CustomEvent('orbital:backend-simulation',{detail:{simulation:true,state:'idle',step:null}}))}
+ }catch(e){$('v58-connection').textContent='Backend unavailable · Run START_VIEWER.cmd ('+e.message+')';$('v58-safety').textContent='No live execution. Status unavailable.';document.dispatchEvent(new CustomEvent('orbital:backend-simulation',{detail:{simulation:true,state:'offline',step:null}}))}finally{pending=false}}
+ $('v58-refresh').onclick=refresh;if(!new URLSearchParams(location.search).has('fixture')){setInterval(refresh,1000);refresh()}
+})();
+</script>
+<div id="v70-dashboard" aria-label="V70 read-only dashboard">
+<section id="v70-connectors" class="v70-panel"><div class="panel-head"><h2>01 / CONNECTORS</h2><span class="panel-count">5 / 8 SLOTS</span></div><div class="panel-body"><div id="v71-monitor"><div id="v71-state" role="status" aria-live="polite">DISCONNECTED</div><div id="v71-detail">No authenticated telemetry session.</div><div id="v71-connectors" aria-label="Connector connection status"></div><details id="v80-connection-settings"><summary>Authentication settings</summary><label for="v80-gateway">Gateway (HTTPS)</label><input id="v80-gateway" type="url" autocomplete="off" spellcheck="false" value="https://neural-grid-monitor-staging.onrender.com" aria-label="Staging gateway URL"><label for="v80-token">Short-lived read-only session token</label><input id="v80-token" type="password" autocomplete="off" spellcheck="false" placeholder="Issued by trusted backend; never issuer key" aria-label="Temporary telemetry token"><small>Manual connection only. Token stays in this tab and is cleared on connection attempt or Disconnect.</small></details><div id="v71-controls"><button id="v71-connect" type="button">Connect</button><button id="v71-disconnect" type="button" disabled>Disconnect</button></div><div id="v71-last-event" aria-live="polite">No verified telemetry received</div></div><button class="add-connector" type="button" disabled>＋ ADD CONNECTOR</button></div></section>
+<section id="v70-activity" class="v70-panel"><div class="panel-head"><h2>02 / ACTIVITY FEED</h2><span class="live-label">OFFLINE</span></div><div class="panel-body"><div id="v88-activity-feed" class="v70-data">No verified GitHub telemetry</div></div></section>
+<section id="v70-system" class="v70-panel v70-bottom"><div class="panel-head"><h2>03 / SYSTEM STATUS</h2></div><div class="panel-body"><div class="v70-data">Awaiting telemetry</div></div></section>
+<section id="v70-flow" class="v70-panel v70-bottom"><div class="panel-head"><h2>04 / EVENT FLOW</h2><span class="panel-caption">GITHUB EVENTS</span></div><div class="panel-body"><div class="v88-chart"><svg viewBox="0 0 320 132" role="img" aria-label="GitHub events by timestamp"><path class="chart-grid" d="M28 18H310M28 55H310M28 92H310M28 18V92M84 18V92M140 18V92M196 18V92M252 18V92M310 18V92"/><polyline id="v88-flow-line" points="28,92 310,92"/><g id="v88-flow-points"></g><text id="v88-flow-start" x="28" y="122"></text><text id="v88-flow-end" x="310" y="122" text-anchor="end"></text></svg></div><div class="v70-data">No verified events</div></div></section>
+<section id="v70-metrics" class="v70-panel v70-bottom"><div class="panel-head"><h2>05 / STATION METRICS</h2></div><div class="panel-body"><div class="v70-data">Unknown metrics</div></div></section>
+<section id="v70-map" class="v70-panel v70-bottom"><div class="panel-head"><h2>06 / CONNECTION MAP</h2></div><div class="panel-body"><svg class="connection-map" viewBox="0 0 320 132" role="img" aria-label="Configured GitHub to staging gateway to read-only viewer topology; other services disconnected"><defs><radialGradient id="map-core"><stop stop-color="#123a5a"/><stop offset=".7" stop-color="#071c34"/><stop offset="1" stop-color="#020b1a"/></radialGradient></defs><ellipse class="map-orbit" cx="160" cy="63" rx="129" ry="49"/><ellipse class="map-orbit tilted" cx="160" cy="63" rx="111" ry="36"/><ellipse class="map-orbit" cx="160" cy="63" rx="72" ry="47"/><circle class="map-globe" cx="160" cy="63" r="46"/><path class="map-grid" d="M114 63h92M160 17v92M120 44q40 20 80 0M120 82q40-20 80 0M145 20q-22 43 0 86M175 20q22 43 0 86"/><path class="map-link" d="M53 34 147 59M160 48V27"/><g class="map-node github"><title>GitHub: configured webhook path</title><circle cx="48" cy="33" r="9"/><text x="48" y="36" text-anchor="middle">GH</text></g><g class="map-node gateway"><title>Staging gateway: read only</title><circle cx="160" cy="63" r="12"/><text x="160" y="66" text-anchor="middle">GW</text></g><g class="map-node viewer"><title>Viewer: manual authenticated session only</title><circle cx="160" cy="18" r="8"/><text x="160" y="21" text-anchor="middle">UI</text></g><g class="map-node dormant"><title>Render: disconnected</title><circle cx="75" cy="102" r="7"/><text x="75" y="105" text-anchor="middle">R</text></g><g class="map-node dormant"><title>Netlify: disconnected</title><circle cx="25" cy="72" r="7"/><text x="25" y="75" text-anchor="middle">N</text></g><g class="map-node dormant"><title>ChatGPT: disconnected</title><circle cx="269" cy="44" r="7"/><text x="269" y="47" text-anchor="middle">C</text></g><g class="map-node dormant"><title>Higgsfield: unconfigured</title><circle cx="255" cy="105" r="7"/><text x="255" y="108" text-anchor="middle">H</text></g><text x="15" y="125">GITHUB → STAGING → VIEWER</text></svg><div class="v70-data">Configured path · disconnected</div></div></section>
+</div>
+<script src="./v88-icons.js" defer></script>
+<script src="./v70-dashboard.js" defer></script>
+<script src="./v71-monitor.js" defer></script>
+<script src="./v87-github-workflows.js" defer></script>
+<script src="./v79-workflows.js" defer></script>
+<link rel="stylesheet" href="./v79-workflows.css">
+<link rel="stylesheet" href="./v80-connect.css">
+
+<!-- V85: V83 base; compact controls immediately beneath header, above Mission Control. -->
+<style id="v85-layout">
+:root{--v85-header-bottom:84px;--v85-controls-height:46px}
+#v85-controls{position:fixed;top:var(--v85-header-bottom);left:12px;z-index:21;display:flex;align-items:flex-start;gap:7px;max-width:calc(100vw - 24px);flex-wrap:nowrap}
+#v85-controls>#v51-open,#v85-controls>#v54-readiness,#v85-controls>#v55-panel{position:relative!important;top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;margin:0!important;width:215px!important;max-width:215px!important;min-width:0!important;min-height:38px!important;box-sizing:border-box!important;padding:8px 10px!important;font:12px system-ui!important;border-radius:9px!important}
+#v85-controls>#v51-open{height:38px!important;white-space:nowrap;text-align:left}
+#v85-controls>#v54-readiness,#v85-controls>#v55-panel{max-height:min(70vh,600px);overflow:auto}
+#v85-controls summary{white-space:nowrap;font-size:12px}
+#v85-controls #v54-readiness pre,#v85-controls #v55-panel pre{white-space:pre-wrap}
+#v51-panel{top:calc(var(--v85-header-bottom) + 46px)!important;bottom:12px!important}
+aside#mission-panel{top:calc(var(--v85-header-bottom) + var(--v85-controls-height) + 9px)!important;max-height:calc(100dvh - var(--v85-header-bottom) - var(--v85-controls-height) - 21px)!important}
+#model-inspector{display:none!important}
+@media(max-width:720px){#v85-controls{left:8px;right:8px;gap:4px;overflow-x:auto;max-width:calc(100vw - 16px)}#v85-controls>#v51-open,#v85-controls>#v54-readiness,#v85-controls>#v55-panel{width:175px!important;max-width:175px!important;flex:0 0 175px;font-size:10px!important;padding:7px!important}#v85-controls summary{font-size:10px}aside#mission-panel{bottom:auto!important}}
+</style>
+<script id="v85-position-controls">
+(()=>{
+const place=()=>{
+ const header=document.querySelector('body>header');const v51=document.getElementById('v51-open');const v54=document.getElementById('v54-readiness');const v55=document.getElementById('v55-panel');
+ if(!header||!v51||!v54||!v55)return;
+ let bar=document.getElementById('v85-controls');if(!bar){bar=document.createElement('div');bar.id='v85-controls';bar.setAttribute('aria-label','Local engine and offline connector tools');document.body.appendChild(bar)}
+ for(const element of [v51,v54,v55])if(element.parentNode!==bar)bar.appendChild(element);
+ const bottom=Math.ceil(header.getBoundingClientRect().bottom)+6;
+ document.documentElement.style.setProperty('--v85-header-bottom',bottom+'px');
+ document.documentElement.style.setProperty('--v85-controls-height',Math.max(40,Math.ceil(bar.getBoundingClientRect().height))+'px');
+};
+window.addEventListener('load',place);window.addEventListener('resize',place);document.addEventListener('DOMContentLoaded',place);
+})();
+</script>
+
+<!-- V86: layout-only refinements; scene, GLB, camera and connector logic untouched. -->
+<style id="v86-layout">
+/* Keep the dynamic status on a second brand line without increasing header height. */
+header>div:first-child{position:relative;min-width:0;flex-shrink:0}
+header>div:first-child>small{display:block;white-space:nowrap}
+header #status{position:static!important;inset:auto!important;display:block!important;max-width:330px;margin:2px 0 0!important;padding:0!important;background:none!important;pointer-events:none;color:#91cce4;font-size:10px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header{min-height:0!important}
+/* Help button is a small inline control immediately left of Command Mode. */
+header .controls{align-items:center}
+header .controls #shortcut-open{position:static!important;inset:auto!important;flex:none!important;min-width:30px;width:30px;height:33px;padding:5px!important;z-index:auto!important;font-size:15px!important;text-align:center}
+/* V55: no internal horizontal scroll/slider when collapsed. */
+#v85-controls>#v55-panel{overflow:visible!important;min-height:42px!important;height:auto!important;padding:10px 10px!important}
+#v85-controls>#v55-panel details{min-width:0;width:100%}
+#v85-controls>#v55-panel summary{white-space:normal!important;overflow-wrap:anywhere;line-height:1.45;padding-right:2px}
+#v85-controls>#v55-panel details[open]{max-height:min(62dvh,540px);overflow-y:auto;overflow-x:hidden}
+#v85-controls>#v55-panel input,#v85-controls>#v55-panel select{max-width:100%;box-sizing:border-box}
+@media(max-width:720px){header #status{max-width:calc(100vw - 24px);font-size:9px}header .controls #shortcut-open{height:30px}#v85-controls>#v55-panel{min-width:175px!important}aside#mission-panel{bottom:48px!important}}
+</style>
+<script id="v86-place-help-and-status">
+(()=>{
+ const place=()=>{
+  const controls=document.querySelector('body>header .controls');
+  const help=document.getElementById('shortcut-open');
+  const command=document.getElementById('command');
+  if(controls&&help&&command&&help.nextElementSibling!==command)controls.insertBefore(help,command);
+  const brand=document.querySelector('body>header>div:first-child');
+  const status=document.getElementById('status');
+  if(brand&&status&&status.parentElement!==brand)brand.appendChild(status);
+ };
+ document.addEventListener('DOMContentLoaded',place);
+ window.addEventListener('load',place);
+})();
+</script>
+</body></html>
+
+<style>
+#v51-panel{width:min(470px,calc(100vw - 28px))}
+#v60-command{margin:12px 0;padding:12px;border:1px solid #479cb6;border-radius:10px;background:#0a2a3c}
+#v60-command h3{margin:0 0 8px;color:#8ceaff;font-size:15px}
+#v60-command p{line-height:1.45;color:#bedbe8}
+#v60-command .v60-actions{display:flex;flex-wrap:wrap;gap:3px;margin:7px 0}
+#v60-command button:disabled{opacity:.4;cursor:not-allowed}
+#v60-stop{border-color:#f17483!important;color:#ffbfc6!important}
+#v60-safety[data-stopped=true]{color:#ff8f9a;font-weight:bold}
+#v60-state{padding:8px 0;overflow-wrap:anywhere}
+#v60-step{margin:7px 0;overflow-wrap:anywhere}
+#v60-feedback{color:#ffd38a;min-height:15px;overflow-wrap:anywhere}
+#v60-command .v60-track{height:9px;background:#18394b;border-radius:8px;overflow:hidden}
+#v60-fill{width:0;height:100%;background:#53d5f3;transition:width .3s}
+#v60-audit-output{max-height:140px;overflow:auto;white-space:pre-wrap}
+/* The old monitor stays in the DOM for compatibility, but V60 puts its controls in one panel. */
+#v58-monitor{display:none}
+@media(max-width:600px){#v51-panel{top:65px;bottom:8px;left:8px;width:calc(100vw - 16px);padding:10px}#v51-open{top:65px;left:8px}}
+</style>
+<script>
+(()=>{
+const el=id=>document.getElementById(id);
+const controls=['approve','pause','resume','cancel'];let jobs=[],selected='',stopped=false,busy=false;
+const active=new Set(['awaiting_approval','queued','running','paused']);
+function feedback(s){el('v60-feedback').textContent=s}
+async function request(path,method='GET',admin=false,body){
+ const headers={};if(admin||method==='POST'){const token=el('v53-token').value;if(!token)throw Error('Enter local administrator token in Backend Security Controls.');headers['X-Orbital-Admin']=token}
+ if(method==='POST')headers['Content-Type']='application/json';
+ const r=await fetch(path,{method,headers,body:body===undefined?(method==='POST'?'{}':undefined):JSON.stringify(body)});
+ const data=await r.json();if(!r.ok)throw Error(data.error||('HTTP '+r.status));return data;
+}
+function render(){
+ const select=el('v60-select');const desired=selected||select.value;
+ select.replaceChildren();
+ if(!jobs.length){select.add(new Option('No jobs',''));selected=''}
+ else{for(const j of jobs)select.add(new Option(j.name+' · '+j.state+' · '+j.id.slice(0,8),j.id));selected=jobs.some(j=>j.id===desired)?desired:jobs[0].id;select.value=selected}
+ const job=jobs.find(j=>j.id===selected),state=job?.state||'none';
+ el('v60-state').textContent=job?job.name+' · '+state+' · '+job.cursor+'/'+job.steps.length+' steps':'No backend workflow selected';
+ const pct=job&&job.steps.length?Math.round(100*job.cursor/job.steps.length):0;
+ el('v60-fill').style.width=pct+'%';el('v60-fill').parentElement.setAttribute('aria-valuenow',String(pct));
+ const step=job&&job.steps[Math.min(job.cursor,job.steps.length-1)];
+ el('v60-step').textContent=job&&step?(state==='completed'?'Last step: ':'Current step: ')+step.from+' → '+step.to+' · '+step.action:'No current step';
+ el('v60-safety').textContent=stopped?'EMERGENCY STOP ACTIVE · All backend execution paused':'Backend default deny · Local simulation only · Approval required';
+ el('v60-safety').dataset.stopped=String(stopped);
+ const enabled={approve:state==='awaiting_approval'&&!stopped,pause:['running','queued'].includes(state),resume:state==='paused'&&!stopped,cancel:active.has(state)};
+ for(const k of controls)el('v60-'+k).disabled=busy||!enabled[k];
+ el('v60-reset').disabled=busy||!stopped;el('v60-stop').disabled=busy||stopped;
+}
+async function refresh(){if(el('v51-panel').dataset.open!=='true')return;try{
+ const [data,policy]=await Promise.all([request('/api/v51/jobs'),request('/api/v53/policy')]);jobs=data.jobs||[];stopped=!!policy.emergency_stop;render();
+ }catch(e){feedback('Local engine unavailable: '+e.message)}}
+el('v60-select').addEventListener('change',()=>{selected=el('v60-select').value;render();const monitor=el('v58-job');if(monitor){monitor.value=selected;monitor.dispatchEvent(new Event('change'))}});
+el('v60-create').onclick=()=>el('v51-submit').click();
+async function perform(action){if(busy)return;const job=jobs.find(j=>j.id===selected);if(!job)return;
+ if(action==='cancel'&&!confirm('Cancel local simulation '+job.name+'?'))return;
+ busy=true;render();try{
+ if(action==='approve')await request('/api/v53/jobs/'+encodeURIComponent(job.id)+'/approve','POST',true);
+ else await request('/api/v51/jobs/'+encodeURIComponent(job.id)+'/'+action,'POST',true);
+ feedback('Workflow '+action+' accepted by backend.');await refresh();
+ }catch(e){feedback(e.message)}finally{busy=false;render()}}
+for(const k of controls)el('v60-'+k).onclick=()=>perform(k);
+async function security(action){if(busy)return;if(action==='stop'&&!confirm('Engage persistent backend emergency stop?'))return;
+ busy=true;render();try{await request('/api/v53/'+action,'POST',true);feedback(action==='stop'?'Emergency stop engaged.':'Emergency stop reset; approvals still required.');await refresh()}
+ catch(e){feedback(e.message)}finally{busy=false;render()}}
+el('v60-stop').onclick=()=>security('stop');el('v60-reset').onclick=()=>security('reset');
+el('v60-audit').onclick=async()=>{try{const data=await request('/api/v53/audit','GET',true);el('v60-audit-output').hidden=false;el('v60-audit-output').textContent=JSON.stringify((data.events||[]).slice(0,20),null,2)}catch(e){feedback(e.message)}};
+el('v51-open').addEventListener('click',()=>{setTimeout(refresh,0)});
+render();if(!new URLSearchParams(location.search).has('fixture'))setInterval(refresh,1200);
+})();
+</script>
+
+<style>
+#v61-bridge{padding:10px;margin:10px 0;border:1px solid #4296ae;border-radius:9px;background:#08283a;color:#d8f4ff}
+#v61-bridge .v61-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:7px 0}
+#v61-bridge button{border:1px solid #4f9fba;border-radius:6px;background:#124159;color:#fff;padding:7px 9px;cursor:pointer}
+#v61-bridge button:disabled{opacity:.45;cursor:default}
+#v61-bridge select{max-width:100%;background:#092b3b;color:#fff;border:1px solid #4f9fba;padding:6px}
+#v61-message{overflow-wrap:anywhere;min-height:16px}
+#v62-demo-controls{border:1px solid #355769;border-radius:8px;margin:10px 0;padding:8px;background:#071c2a}
+#v62-demo-controls>summary{cursor:pointer;color:#aed8e6;font-size:12px}
+#v61-bridge{border-color:#68d9e9;background:#092e3d}
+</style>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const host=$('workflow-steps');if(!host||!$('v51-panel'))return;
+const card=document.createElement('section');card.id='v61-bridge';card.setAttribute('aria-label','V61 persistent backend workflow bridge');
+card.innerHTML='<strong>V62 · Primary Backend Workflow</strong><p>Queue your visual draft for local administrator approval. The legacy browser demo is collapsed below; no external service is connected.</p><div class="v61-row"><button id="v61-queue" type="button">Queue Draft for Approval</button><button id="v61-open" type="button">Review / Approve in Engine</button></div><div class="v61-row"><label for="v61-job">Track saved job</label><select id="v61-job"><option value="">Latest job</option></select></div><div id="v61-state" role="status">Backend status pending</div><div id="v61-message" role="status" aria-live="polite"></div>';
+host.parentElement.insertBefore(card,document.getElementById('v62-demo-controls'));
+let chosen='',busy=false,latest=[];
+const msg=t=>{$('v61-message').textContent=t};
+function draft(){try{const v=JSON.parse(localStorage.getItem('orbital-nexus-v8-workflow')||'[]');if(!Array.isArray(v))return [];return v.filter(x=>x&&typeof x.from==='string'&&typeof x.to==='string'&&typeof x.action==='string').map(x=>({from:x.from,to:x.to,action:x.action}));}catch{return []}}
+function openBackend(){const p=$('v51-panel');if(p.dataset.open!=='true')$('v51-open').click();p.scrollIntoView({block:'nearest'});}
+$('v61-open').onclick=openBackend;
+$('v61-queue').onclick=async()=>{
+ if(busy)return;const steps=draft();if(!steps.length)return msg('Add at least one workflow step before queueing.');
+ if(steps.some(x=>x.from===x.to||!x.action.trim()))return msg('Each step needs two different stations and a description.');
+ busy=true;$('v61-queue').disabled=true;
+ try{const name=$('workflow-name').value.trim()||'Mission Control workflow';
+ const token=document.getElementById('v53-token')?.value||'';if(!token)throw Error('Enter administrator token in Backend Security Controls.');const r=await fetch('/api/v51/jobs',{method:'POST',headers:{'Content-Type':'application/json','X-Orbital-Admin':token},body:JSON.stringify({name,steps})});
+ const j=await r.json();if(!r.ok)throw Error(j.error||'HTTP '+r.status);
+ chosen=j.id;msg('Queued '+j.id.slice(0,8)+' · AWAITING ADMIN APPROVAL. Open Backend Controls to approve.');
+ await refresh();
+ }catch(e){msg('Not queued: '+e.message+' · Run START_VIEWER.cmd for the local backend.')}finally{busy=false;$('v61-queue').disabled=false}
+};
+$('v61-job').onchange=()=>{chosen=$('v61-job').value;show();};
+function show(){const j=chosen?latest.find(x=>x.id===chosen):latest[0];
+ $('v61-state').textContent=j?j.name+' · '+j.state.toUpperCase()+' · '+j.cursor+'/'+j.steps.length+' simulated steps':'No saved backend jobs';
+ if(j){const v60=$('v60-select');if(v60&&Array.from(v60.options).some(x=>x.value===j.id)){v60.value=j.id;v60.dispatchEvent(new Event('change'))}const monitor=$('v58-job');if(monitor&&Array.from(monitor.options).some(x=>x.value===j.id)){monitor.value=j.id;monitor.dispatchEvent(new Event('change'))}}
+}
+async function refresh(){if(document.hidden)return;try{const r=await fetch('/api/v51/jobs',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const j=await r.json();latest=Array.isArray(j.jobs)?j.jobs:[];
+ const select=$('v61-job');select.replaceChildren(new Option('Latest job',''));
+ for(const job of latest)select.add(new Option(job.name+' · '+job.state+' · '+job.id.slice(0,8),job.id));
+ if(chosen&&!latest.some(j=>j.id===chosen))chosen='';select.value=chosen;show();
+ }catch(e){$('v61-state').textContent='Backend unavailable · '+e.message}}
+if(!new URLSearchParams(location.search).has('fixture')){setInterval(refresh,1500);refresh()}
+})();
+</script>
+
+<!-- V63: read-only durable workflow timeline; no connector privileges -->
+<style>
+#v63-timeline{margin:12px 0;padding:10px;background:#071e2b;border:1px solid #356b82;border-radius:9px;color:#d5eff9;font:12px system-ui}
+#v63-timeline summary{cursor:pointer;font-weight:700;color:#9ee7fb}
+#v63-timeline .v63-meta{margin:8px 0;color:#aacbd9}
+#v63-timeline ol{list-style:none;padding:0;margin:8px 0;max-height:250px;overflow:auto}
+#v63-timeline li{border-left:2px solid #47798c;padding:5px 9px;margin:0 0 5px;overflow-wrap:anywhere}
+#v63-timeline li[data-kind="completed"]{border-color:#45bc98}
+#v63-timeline li[data-kind="paused"]{border-color:#f5b65d}
+#v63-timeline li[data-kind="approval"]{border-color:#f5b65d}
+#v63-timeline time{color:#91b5c7;display:block;font-size:11px}
+#v63-timeline button{background:#14394d;border:1px solid #487f95;color:#d5eff9;border-radius:5px;padding:5px 8px}
+</style>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const bridge=$('v61-bridge');if(!bridge)return;
+const panel=document.createElement('details');panel.id='v63-timeline';panel.open=true;
+const heading=document.createElement('summary');heading.textContent='V63 · Persistent Execution Timeline (simulation)';panel.append(heading);
+const meta=document.createElement('p');meta.className='v63-meta';meta.id='v63-meta';meta.setAttribute('role','status');meta.textContent='Select a saved backend job to inspect its timeline.';panel.append(meta);
+const refreshButton=document.createElement('button');refreshButton.type='button';refreshButton.id='v63-refresh';refreshButton.textContent='Refresh timeline';panel.append(refreshButton);
+const items=document.createElement('ol');items.id='v63-events';items.setAttribute('aria-label','Workflow execution history');panel.append(items);
+bridge.append(panel);
+let lastJob='',lastSignature='',pending=false;
+function jobId(){const chosen=$('v61-job')?.value;return chosen||$('v61-job')?.options?.[1]?.value||''}
+function render(events,job){
+ const signature=JSON.stringify([job.id,job.state,job.cursor,events]);if(signature===lastSignature)return;lastSignature=signature;
+ meta.textContent=job.name+' · '+job.state.toUpperCase()+' · '+job.cursor+'/'+job.steps.length+' steps · Local simulation only';
+ items.replaceChildren();
+ const ordered=[...events].reverse();
+ for(const event of ordered){
+  const li=document.createElement('li');const label=document.createElement('span');const t=document.createElement('time');
+  const name=String(event.event||'event');label.textContent=name;
+  li.dataset.kind=name.includes('completed')?'completed':name.includes('paused')?'paused':name.includes('approval')||name.includes('approved')?'approval':'other';
+  const ts=Number(event.timestamp);t.textContent=Number.isFinite(ts)?new Date(ts*1000).toLocaleString():'Time unavailable';
+  li.append(label,t);items.append(li);
+ }
+ if(!ordered.length){const li=document.createElement('li');li.textContent='No recorded events for this workflow.';items.append(li)}
+}
+async function refresh(){if(pending||document.hidden)return;pending=true;
+ try{
+  const id=jobId();if(!id){lastJob='';lastSignature='';meta.textContent='No saved workflow selected.';items.replaceChildren();return}
+  if(id!==lastJob){lastJob=id;lastSignature='';items.replaceChildren()}
+  const [jobResponse,eventResponse]=await Promise.all([fetch('/api/v51/jobs/'+encodeURIComponent(id),{cache:'no-store'}),fetch('/api/v51/jobs/'+encodeURIComponent(id)+'/events',{cache:'no-store'})]);
+  if(!jobResponse.ok||!eventResponse.ok)throw Error('HTTP '+(jobResponse.ok?eventResponse.status:jobResponse.status));
+  const [job,data]=await Promise.all([jobResponse.json(),eventResponse.json()]);
+  if(jobId()!==id)return;
+  render(Array.isArray(data.events)?data.events:[],job);
+ }catch(e){meta.textContent='Timeline unavailable: '+e.message;items.replaceChildren();lastSignature=''}
+ finally{pending=false}
+}
+refreshButton.onclick=refresh;$('v61-job')?.addEventListener('change',refresh);
+if(!new URLSearchParams(location.search).has('fixture')){setInterval(refresh,1500);refresh()}
+})();
+</script>
+
+<!-- V64 read-only workflow diagnostics; local simulation only -->
+<style>
+#v64-diagnostics{margin:12px 0;padding:11px;border:1px solid #356b82;border-radius:9px;background:#071e2b;color:#d5eff9;font:12px system-ui}
+#v64-diagnostics summary{cursor:pointer;color:#9ee7fb;font-weight:700}
+#v64-diagnostics .v64-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px}
+#v64-diagnostics .v64-cell{padding:7px;background:#0c3041;border-radius:5px;overflow-wrap:anywhere}
+#v64-diagnostics .v64-note{margin:8px 0;color:#a9d0df;overflow-wrap:anywhere}
+#v64-diagnostics [data-severity="warning"]{color:#ffd18a}
+#v64-diagnostics [data-severity="error"]{color:#ff9c9c}
+</style>
+<script>
+(()=>{
+'use strict';
+const bridge=document.getElementById('v61-bridge');if(!bridge)return;
+const panel=document.createElement('details');panel.id='v64-diagnostics';panel.open=true;
+const title=document.createElement('summary');title.textContent='V64 · Workflow Diagnostics (read-only)';panel.append(title);
+const status=document.createElement('p');status.id='v64-status';status.className='v64-note';status.setAttribute('role','status');panel.append(status);
+const stats=document.createElement('div');stats.id='v64-stats';stats.className='v64-grid';panel.append(stats);
+const warning=document.createElement('p');warning.id='v64-warning';warning.className='v64-note';panel.append(warning);
+const refreshButton=document.createElement('button');refreshButton.id='v64-refresh';refreshButton.type='button';refreshButton.textContent='Refresh diagnostics';panel.append(refreshButton);
+bridge.append(panel);
+const pick=()=>document.getElementById('v61-job')?.value||'';
+const STALL_SECONDS=30;let pending=false;
+function cell(label,value){const node=document.createElement('div');node.className='v64-cell';const strong=document.createElement('strong');strong.textContent=label+': ';const text=document.createElement('span');text.textContent=String(value);node.append(strong,text);stats.append(node)}
+function diagnose(job,events,now){
+ const count=Array.isArray(job.steps)?job.steps.length:0;
+ const done=Math.min(Math.max(Number(job.cursor)||0,0),count);
+ const age=Math.max(0,Math.floor(now-(Number(job.updated)||now)));
+ const last=events.length?events[0]:null;
+ const state=String(job.state||'unknown');
+ let severity='normal',message='No failure or stall detected.';
+ if(state==='failed'||job.error){severity='error';message='Workflow failure: '+String(job.error||'Backend reported failed state.')}
+ else if(state==='running'&&age>=STALL_SECONDS){severity='warning';message='Potential stall: no backend job update for '+age+' seconds. This is a heuristic, not proof of a deadlock.'}
+ else if(state==='awaiting_approval'){message='Waiting for explicit administrator approval; not stalled.'}
+ else if(state==='paused'){message='Paused by control or safety policy; not classified as stalled.'}
+ else if(state==='cancelled'){message='Workflow cancelled; no execution expected.'}
+ else if(state==='completed'){message='Workflow completed (simulation only).'}
+ return {state,count,done,age,severity,message,lastEvent:last?.event||'None',lastTime:last?.timestamp||null,progress:count?Math.round(done*100/count):0};
+}
+async function refresh(){if(pending||document.hidden)return;pending=true;
+ try{
+  const id=pick();stats.replaceChildren();warning.textContent='';
+  if(!id){status.textContent='Select a saved backend job to inspect diagnostics.';return}
+  const [jr,er]=await Promise.all([fetch('/api/v51/jobs/'+encodeURIComponent(id),{cache:'no-store'}),fetch('/api/v51/jobs/'+encodeURIComponent(id)+'/events',{cache:'no-store'})]);
+  if(!jr.ok||!er.ok)throw Error('Backend HTTP '+(!jr.ok?jr.status:er.status));
+  const [job,payload]=await Promise.all([jr.json(),er.json()]);if(pick()!==id)return;
+  const result=diagnose(job,Array.isArray(payload.events)?payload.events:[],Date.now()/1000);
+  status.textContent=String(job.name||'Workflow')+' · '+result.state.toUpperCase()+' · offline simulation';
+  cell('Completed steps',result.done+' / '+result.count);cell('Progress',result.progress+'%');
+  cell('Seconds since update',result.age);cell('Recorded events',Array.isArray(payload.events)?payload.events.length:0);
+  cell('Latest event',result.lastEvent);cell('Last event time',result.lastTime?new Date(result.lastTime*1000).toLocaleString():'Unavailable');
+  warning.textContent=result.message;warning.dataset.severity=result.severity;
+ }catch(error){status.textContent='Diagnostics unavailable: '+error.message;stats.replaceChildren();warning.textContent='No conclusions can be drawn while backend data is unavailable.';warning.dataset.severity='warning'}
+ finally{pending=false}
+}
+refreshButton.addEventListener('click',refresh);document.getElementById('v61-job')?.addEventListener('change',refresh);
+if(!new URLSearchParams(location.search).has('fixture')){setInterval(refresh,2000);refresh()}
+})();
+</script>
+
+<!-- V65 read-only operational dashboard; offline simulation -->
+<style>
+#v65-dashboard{margin:12px 0;padding:11px;background:#071e2b;border:1px solid #3b829d;border-radius:9px;color:#d5eff9;font:12px system-ui}
+#v65-dashboard summary{cursor:pointer;color:#9ee7fb;font-weight:700}
+#v65-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:9px 0}
+#v65-metrics div{background:#0d3042;padding:8px 5px;border-radius:6px;text-align:center}
+#v65-metrics strong{display:block;font-size:18px;color:#b4efff}
+#v65-recent{margin:8px 0;padding-left:20px;max-height:160px;overflow:auto}
+#v65-recent li{margin:4px 0;overflow-wrap:anywhere}
+#v65-dashboard button{border:1px solid #4f9fba;background:#124159;color:white;border-radius:6px;padding:6px 9px}
+</style>
+<script>
+(()=>{
+'use strict';
+const bridge=document.getElementById('v61-bridge');if(!bridge)return;
+const panel=document.createElement('details');panel.id='v65-dashboard';panel.open=true;
+const summary=document.createElement('summary');summary.textContent='V65 · Operational Dashboard (local simulation)';panel.append(summary);
+const status=document.createElement('p');status.id='v65-status';status.setAttribute('role','status');status.textContent='Loading local queue…';panel.append(status);
+const metrics=document.createElement('div');metrics.id='v65-metrics';panel.append(metrics);
+const heading=document.createElement('strong');heading.textContent='Recent failures / cancellations';panel.append(heading);
+const recent=document.createElement('ol');recent.id='v65-recent';panel.append(recent);
+const refreshButton=document.createElement('button');refreshButton.id='v65-refresh';refreshButton.type='button';refreshButton.textContent='Refresh dashboard';panel.append(refreshButton);
+bridge.prepend(panel);
+const states=['awaiting_approval','queued','running','paused','completed','failed','cancelled'];
+let pending=false;
+function metric(name,value){const cell=document.createElement('div');const number=document.createElement('strong');number.textContent=String(value);const label=document.createElement('span');label.textContent=name;cell.append(number,label);metrics.append(cell)}
+function safeAge(job,now){const updated=Number(job.updated);return Number.isFinite(updated)&&updated>0?Math.max(0,now-updated):0}
+async function refresh(){if(pending||document.hidden)return;pending=true;
+ try{
+  const response=await fetch('/api/v51/jobs',{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);
+  const data=await response.json();if(!Array.isArray(data.jobs))throw Error('Invalid backend response');
+  const jobs=data.jobs;const counts=Object.fromEntries(states.map(s=>[s,0]));const now=Date.now()/1000;
+  for(const job of jobs){if(Object.hasOwn(counts,job.state))counts[job.state]++}
+  const stalled=jobs.filter(j=>j.state==='running'&&safeAge(j,now)>=30).length;
+  metrics.replaceChildren();metric('Total jobs',jobs.length);metric('Awaiting approval',counts.awaiting_approval);metric('Running',counts.running);metric('Completed',counts.completed);metric('Failed',counts.failed);metric('Paused',counts.paused);metric('Cancelled',counts.cancelled);metric('Queued',counts.queued);metric('Potential stalls',stalled);
+  const failures=jobs.filter(j=>j.state==='failed'||j.state==='cancelled').sort((a,b)=>(Number(b.updated)||0)-(Number(a.updated)||0)).slice(0,5);
+  recent.replaceChildren();if(!failures.length){const item=document.createElement('li');item.textContent='No failed or cancelled jobs in the saved queue.';recent.append(item)}
+  for(const job of failures){const item=document.createElement('li');const stamp=Number(job.updated);const when=Number.isFinite(stamp)&&stamp>0?new Date(stamp*1000).toLocaleString():'Unknown time';item.textContent=String(job.name||'Unnamed')+' · '+String(job.state)+' · '+when;recent.append(item)}
+  status.textContent='Local backend online · '+jobs.length+' saved jobs · '+(stalled?'Potential stalls are heuristic warnings.':'No potential running-job stalls.')+' External services disconnected.';
+ }catch(error){status.textContent='Dashboard unavailable: '+error.message;metrics.replaceChildren();recent.replaceChildren()}
+ finally{pending=false}
+}
+refreshButton.addEventListener('click',refresh);if(!new URLSearchParams(location.search).has('fixture')){setInterval(refresh,3000);refresh()}
+})();
+</script>

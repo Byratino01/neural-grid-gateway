@@ -8,11 +8,9 @@ services:
     envVars:
       - key: GITHUB_WEBHOOK_SECRET
         sync: false
-      - key: OPENAI_API_KEY
+      - key: TELEMETRY_SESSION_ISSUER_KEY
         sync: false
-      - key: GATEWAY_TOKEN
+      - key: TELEMETRY_SESSION_SIGNING_KEY
         sync: false
-      - key: OPENAI_MODEL
-        value: gpt-5-mini
       - key: CORS_ORIGIN
         sync: false

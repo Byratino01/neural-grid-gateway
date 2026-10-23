@@ -1,0 +1,97 @@
+/* Orbital Nexus V70 — approved dashboard panel placement.
+   Opt in by adding ng-v70-layout to the viewer root.
+   Applies ONLY to HTML HUD elements; never to canvas, Three.js scene or camera.
+   Required hooks: data-ng-region="header|connectors|activity|system|flow|metrics|map|footer".
+   Desktop: header across top, connectors left, activity right, 4 bottom modules.
+*/
+.ng-v70-layout {
+  --ng-hud-gap: 12px;
+  --ng-hud-margin: 16px;
+  --ng-hud-header: 64px;
+  --ng-hud-footer: 34px;
+  --ng-hud-bottom: clamp(165px, 23vh, 220px);
+  --ng-hud-left: clamp(250px, 23vw, 370px);
+  --ng-hud-right: clamp(260px, 23vw, 370px);
+}
+.ng-v70-layout [data-ng-region] {
+  position: absolute;
+  z-index: 10;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.ng-v70-layout [data-ng-region="header"] {
+  top: var(--ng-hud-margin);
+  left: var(--ng-hud-margin);
+  right: var(--ng-hud-margin);
+  height: var(--ng-hud-header);
+}
+.ng-v70-layout [data-ng-region="connectors"],
+.ng-v70-layout [data-ng-region="activity"] {
+  top: calc(var(--ng-hud-margin) + var(--ng-hud-header) + var(--ng-hud-gap));
+  bottom: calc(var(--ng-hud-margin) + var(--ng-hud-footer) + var(--ng-hud-bottom) + 2 * var(--ng-hud-gap));
+  overflow: auto;
+}
+.ng-v70-layout [data-ng-region="connectors"] {
+  left: var(--ng-hud-margin);
+  width: var(--ng-hud-left);
+}
+.ng-v70-layout [data-ng-region="activity"] {
+  right: var(--ng-hud-margin);
+  width: var(--ng-hud-right);
+}
+.ng-v70-layout [data-ng-region="system"],
+.ng-v70-layout [data-ng-region="flow"],
+.ng-v70-layout [data-ng-region="metrics"],
+.ng-v70-layout [data-ng-region="map"] {
+  bottom: calc(var(--ng-hud-margin) + var(--ng-hud-footer) + var(--ng-hud-gap));
+  height: var(--ng-hud-bottom);
+  width: calc((100% - 2 * var(--ng-hud-margin) - 3 * var(--ng-hud-gap)) / 4);
+  overflow: auto;
+}
+.ng-v70-layout [data-ng-region="system"] { left: var(--ng-hud-margin); }
+.ng-v70-layout [data-ng-region="flow"] {
+  left: calc(var(--ng-hud-margin) + (100% - 2 * var(--ng-hud-margin) - 3 * var(--ng-hud-gap)) / 4 + var(--ng-hud-gap));
+}
+.ng-v70-layout [data-ng-region="metrics"] {
+  right: calc(var(--ng-hud-margin) + (100% - 2 * var(--ng-hud-margin) - 3 * var(--ng-hud-gap)) / 4 + var(--ng-hud-gap));
+}
+.ng-v70-layout [data-ng-region="map"] { right: var(--ng-hud-margin); }
+.ng-v70-layout [data-ng-region="footer"] {
+  left: var(--ng-hud-margin);
+  right: var(--ng-hud-margin);
+  bottom: var(--ng-hud-margin);
+  height: var(--ng-hud-footer);
+}
+@media (max-width: 1050px) {
+  .ng-v70-layout {
+    --ng-hud-left: clamp(190px, 27vw, 260px);
+    --ng-hud-right: clamp(190px, 27vw, 260px);
+    --ng-hud-bottom: clamp(130px, 20vh, 170px);
+    --ng-hud-gap: 8px;
+    --ng-hud-margin: 10px;
+  }
+}
+@media (max-width: 720px) {
+  /* Mobile/iPad portrait: leave the orbital canvas visible, scroll the HTML HUD.
+     No modification of 3D transforms or camera. */
+  .ng-v70-layout [data-ng-region="header"] { height: 52px; }
+  .ng-v70-layout [data-ng-region="connectors"],
+  .ng-v70-layout [data-ng-region="activity"] {
+    top: 72px;
+    bottom: auto;
+    height: min(31vh, 250px);
+    width: calc((100% - 3 * var(--ng-hud-margin)) / 2);
+  }
+  .ng-v70-layout [data-ng-region="system"],
+  .ng-v70-layout [data-ng-region="flow"],
+  .ng-v70-layout [data-ng-region="metrics"],
+  .ng-v70-layout [data-ng-region="map"] {
+    bottom: calc(var(--ng-hud-margin) + var(--ng-hud-footer) + var(--ng-hud-gap));
+    height: min(19vh, 150px);
+    width: calc((100% - 5 * var(--ng-hud-margin)) / 4);
+  }
+  .ng-v70-layout [data-ng-region="system"] {left: var(--ng-hud-margin);}
+  .ng-v70-layout [data-ng-region="flow"] {left: calc(25% + var(--ng-hud-margin) / 2);}
+  .ng-v70-layout [data-ng-region="metrics"] {right: calc(25% + var(--ng-hud-margin) / 2);}
+  .ng-v70-layout [data-ng-region="map"] {right: var(--ng-hud-margin);}
+}

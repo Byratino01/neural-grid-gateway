@@ -1,0 +1,40 @@
+/* V77: style an existing GitHub station control only.
+   No GLB, scene geometry, camera, or transform mutations. */
+[data-station-id="github"] {
+  --workflow-pulse-period: 2200ms;
+  --workflow-pulse-intensity: .55;
+  position: relative;
+}
+[data-station-id="github"][data-workflow-status="active"]::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 1px solid rgba(75, 202, 255, var(--workflow-pulse-intensity));
+  border-radius: inherit;
+  pointer-events: none;
+  animation: ng-github-activity var(--workflow-pulse-period) ease-in-out infinite;
+}
+[data-station-id="github"][data-workflow-status="uncertain"]::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 1px dashed rgba(245, 190, 75, .8);
+  border-radius: inherit;
+  pointer-events: none;
+}
+[data-station-id="github"] [data-workflow-count] {
+  font-variant-numeric: tabular-nums;
+  font-size: .75rem;
+  min-width: 1.5em;
+  text-align: center;
+}
+@keyframes ng-github-activity {
+  0%,100% { opacity: .35; box-shadow: 0 0 2px rgba(75,202,255,.2); }
+  50% { opacity: 1; box-shadow: 0 0 14px rgba(75,202,255,.65); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-station-id="github"][data-workflow-status="active"]::after {
+    animation: none;
+    opacity: 1;
+  }
+}
