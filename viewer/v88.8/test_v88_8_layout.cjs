@@ -179,10 +179,11 @@ const overlaps = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 &&
       const modelUrl = baseUrl.replace('fixture=1', 'fixture=0');
       const modelResponse = await modelPage.goto(modelUrl, {waitUntil:'domcontentloaded'});
       assert.equal(modelResponse.status(), 200, 'non-fixture viewer HTTP status');
-      await modelPage.locator('#model-inspector[data-visible="true"]').waitFor({timeout:120000});
-      assert.match(await modelPage.locator('#model-inspector-name').innerText(), /orbital-nexus\.glb$/);
-      assert.match(await modelPage.locator('#model-inspector-details').innerText(), /meshes/);
-      assert.equal(await modelPage.locator('#status').innerText().then(text => text.includes('Orbital Nexus loaded')), true,
+      await modelPage.waitForFunction(() =>
+        document.querySelector('#model-inspector')?.dataset.visible === 'true', null, {timeout:120000});
+      assert.match(await modelPage.locator('#model-inspector-name').textContent(), /orbital-nexus\.glb$/);
+      assert.match(await modelPage.locator('#model-inspector-details').textContent(), /meshes/);
+      assert.equal(await modelPage.locator('#status').textContent().then(text => text.includes('Orbital Nexus loaded')), true,
         'GLTFLoader installs the bundled GLB in the actual viewer');
       await modelPage.close();
     }
