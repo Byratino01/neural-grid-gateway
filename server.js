@@ -169,7 +169,11 @@ function rateAllowed(req, limit = 120) {
   // viewer load must not starve the server-only session issuance endpoint, while
   // both buckets remain bounded per remote address.
   const route = String(req.url || "").split("?")[0];
-  const bucketClass = route === "/api/telemetry/sessions" ? "session-issuer" : "general";
+  const bucketClass = route === "/api/telemetry/sessions"
+    ? "session-issuer"
+    : route === "/viewer" || route.startsWith("/viewer/")
+      ? "viewer-assets"
+      : "general";
   const key = (req.socket.remoteAddress || "unknown") + ":" + bucketClass;
   const bucket = requestBuckets.get(key);
   if (!bucket || now - bucket.start >= 60000) { requestBuckets.set(key,{start:now,count:1}); return true; }
@@ -195,7 +199,10 @@ function consumeWsTicket(ticket,origin) {
 const server = http.createServer(async (req,res) => {
   const origin = requestOrigin(req);
   try {
-    if (!rateAllowed(req, req.url === "/api/telemetry/sessions" ? 20 : 120)) return json(res,429,{error:"rate_limited"},origin);
+    const route = String(req.url || "").split("?")[0];
+    const rateLimit = route === "/api/telemetry/sessions" ? 20 :
+      route === "/viewer" || route.startsWith("/viewer/") ? 600 : 120;
+    if (!rateAllowed(req, rateLimit)) return json(res,429,{error:"rate_limited"},origin);
     if (req.method === "OPTIONS") {
       if (!origin || !allowedOrigins.includes(origin)) return json(res,403,{error:"origin_not_allowed"});
       res.writeHead(204,{
