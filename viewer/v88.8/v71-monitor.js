@@ -124,7 +124,12 @@ async function connect() {
     const historyPayload=await historyResponse.json();
     if (Array.isArray(historyPayload.events)) for (const event of historyPayload.events) ingest(event);
     if (ticket!==attempt) return;
-    const ws=new WebSocket(base.replace(/^https:/,'wss:')+'/events',['neural-grid-telemetry-v1','ng-auth.'+token]);
+    const ticketResponse=await fetch(base+'/api/events/ticket',{method:'POST',headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
+    if(ticket!==attempt)return;
+    if(!ticketResponse.ok)throw Error('WebSocket ticket HTTP '+ticketResponse.status);
+    const ticketData=await ticketResponse.json();
+    if(typeof ticketData.ticket!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(ticketData.ticket))throw Error('Invalid WebSocket ticket');
+    const ws=new WebSocket(base.replace(/^https:/,'wss:').replace(/^http:/,'ws:')+'/events',['neural-grid-telemetry-v1','ng-ticket.'+ticketData.ticket]);
     socket=ws;
     ws.onopen=()=>{if(ticket===attempt){
       expiresAt=Date.now()+lifetime*1000;
