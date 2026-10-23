@@ -191,7 +191,9 @@ test("session scope, signature, and server-side expiration are enforced",async()
     assert.equal((await request(signedSession({...claims,exp:Math.floor(Date.now()/1000)-1}))).status,401,
       "expired token is rejected server-side");
     const [payload,signature]=valid.split(".");
-    const tamperedSignature=(signature[0]==="A"?"B":"A")+signature.slice(1);
+    const corrupted=Buffer.from(signature,"base64url");
+    corrupted[0]^=0x01;
+    const tamperedSignature=corrupted.toString("base64url");
     assert.equal((await request(payload+"."+tamperedSignature)).status,401,
       "incorrect signature is rejected");
   });
