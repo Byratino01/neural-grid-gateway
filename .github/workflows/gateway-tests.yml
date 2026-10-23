@@ -3,6 +3,11 @@ on:
   push:
     branches: [feature/monitor-mode-gateway-v2, feature/modular-architecture-regression-v1, feature/v88-8-chatgpt-readonly]
   pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: gateway-tests-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -11,5 +16,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install
+          cache: npm
+      - run: npm ci
       - run: npm test
