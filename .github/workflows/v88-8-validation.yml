@@ -46,6 +46,7 @@ jobs:
       - name: Run V88.8 Chromium layout checks at five viewports
         env:
           V88_6_URL: http://127.0.0.1:18765/viewer/v70.html?fixture=1&asset=rollback
+          V88_MODEL_SMOKE: '1'
           TELEMETRY_SESSION_ISSUER_KEY: ci-issuer-key
           GITHUB_WEBHOOK_SECRET: ci-webhook-secret
         run: node viewer/v88.8/test_v88_8_layout.cjs
