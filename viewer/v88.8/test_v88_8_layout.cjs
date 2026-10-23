@@ -174,6 +174,19 @@ const overlaps = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 &&
       await page.close();
     }
 
+    if (requestedUrl && process.env.V88_MODEL_SMOKE === '1') {
+      const modelPage = await browser.newPage({viewport:{width:1366,height:768}, deviceScaleFactor:1});
+      const modelUrl = baseUrl.replace('fixture=1', 'fixture=0');
+      const modelResponse = await modelPage.goto(modelUrl, {waitUntil:'domcontentloaded'});
+      assert.equal(modelResponse.status(), 200, 'non-fixture viewer HTTP status');
+      await modelPage.locator('#model-inspector[data-visible="true"]').waitFor({timeout:120000});
+      assert.match(await modelPage.locator('#model-inspector-name').innerText(), /orbital-nexus\.glb$/);
+      assert.match(await modelPage.locator('#model-inspector-details').innerText(), /meshes/);
+      assert.equal(await modelPage.locator('#status').innerText().then(text => text.includes('Orbital Nexus loaded')), true,
+        'GLTFLoader installs the bundled GLB in the actual viewer');
+      await modelPage.close();
+    }
+
     // End-to-end manual-token path: trusted operator-side test code issues the
     // credential; the browser only receives the short-lived viewer token.
     // The built-in static fixture server has no gateway API; reserve this part
