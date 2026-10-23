@@ -115,7 +115,7 @@ test("signed webhook emits sanitized metadata and rejects duplicates",async()=>{
   });
 });
 test("websocket refuses missing token and accepts valid scoped subscription",async()=>{
-  await withGateway(async({port,issue})=>{
+  await withGateway(async({port,issue,url})=>{
     const connect=(protocols)=>new Promise(resolve=>{
       const ws=new WebSocket(`ws://127.0.0.1:${port}/events`,protocols,{origin:"https://viewer.example",handshakeTimeout:2000});
       ws.once("message",message=>{ws.close();resolve({ok:true,event:JSON.parse(String(message))});});
@@ -124,7 +124,14 @@ test("websocket refuses missing token and accepts valid scoped subscription",asy
     });
     assert.equal((await connect(["neural-grid-telemetry-v1"])).ok,false);
     const session=await issue();
-    const accepted=await connect(["neural-grid-telemetry-v1","ng-auth."+session]);
+    const unauthorized=await fetch(url+"/api/events/ticket",{method:"POST",headers:{origin:"https://viewer.example"}});
+    assert.equal(unauthorized.status,401);
+    const response=await fetch(url+"/api/events/ticket",{method:"POST",headers:{authorization:"Bearer "+session,origin:"https://viewer.example"}});
+    assert.equal(response.status,201);
+    const {ticket}=await response.json();
+    assert.match(ticket,/^[A-Za-z0-9_-]{43}$/);
+    const accepted=await connect(["neural-grid-telemetry-v1","ng-ticket."+ticket]);
+    assert.equal((await connect(["neural-grid-telemetry-v1","ng-ticket."+ticket])).ok,false,"single-use ticket rejects replay");
     assert.equal(accepted.ok,true);
     assert.equal(accepted.event.type,"connector.connected");
   });
