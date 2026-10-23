@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: v88-8-validation-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -24,10 +27,28 @@ jobs:
           for file in viewer/v88.8/*.js; do node --check "$file"; done
       - name: Run gateway, security, telemetry, and static serving tests
         run: npm test
-      - name: Install Chromium test runner
+      - name: Configure Playwright with runner Chrome
         run: |
-          npm install --no-save --no-package-lock playwright
-          npx playwright install --with-deps chromium
+          npm install --no-save --no-package-lock playwright-core@1.64.1
+          chrome_path="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -n "$chrome_path" ]; then
+            "$chrome_path" --version
+            echo "PLAYWRIGHT_CHROME_PATH=$chrome_path" >> "$GITHUB_ENV"
+            echo "BROWSER_SOURCE=runner-google-chrome" >> "$GITHUB_ENV"
+          else
+            echo "Runner Chrome unavailable; installing Playwright Chromium fallback."
+            npx --no-install playwright-core install --with-deps chromium
+            echo "BROWSER_SOURCE=playwright-chromium" >> "$GITHUB_ENV"
+          fi
+      - name: Verify browser executable
+        run: |
+          echo "Browser source: $BROWSER_SOURCE"
+          if [ -n "${PLAYWRIGHT_CHROME_PATH:-}" ]; then
+            test -x "$PLAYWRIGHT_CHROME_PATH"
+            "$PLAYWRIGHT_CHROME_PATH" --version
+          else
+            node -e "const {chromium}=require('playwright-core'); if (!chromium.executablePath()) process.exit(1); console.log(chromium.executablePath())"
+          fi
       - name: Start gateway for browser validation
         env:
           PORT: 18765
